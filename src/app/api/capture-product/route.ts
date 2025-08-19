@@ -1,0 +1,751 @@
+import { NextRequest, NextResponse } from 'next/server';
+import puppeteer from 'puppeteer';
+import UserAgent from 'user-agents';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+
+interface ScrapedProduct {
+  title: string;
+  price: number;
+  originalPrice?: number;
+  image: string;
+  rating?: number;
+  reviewCount?: number;
+  description?: string;
+  features?: string[];
+  availability: 'in_stock' | 'out_of_stock' | 'limited';
+  store: 'amazon' | 'walmart' | 'ebay';
+}
+
+function detectStore(url: string): 'amazon' | 'walmart' | 'ebay' | null {
+  const hostname = new URL(url).hostname.toLowerCase();
+  
+  if (hostname.includes('amazon.')) {
+    return 'amazon';
+  } else if (hostname.includes('walmart.')) {
+    return 'walmart';
+  } else if (hostname.includes('ebay.')) {
+    return 'ebay';
+  }
+  
+  return null;
+}
+
+async function scrapeAmazonFallback(url: string): Promise<ScrapedProduct | null> {
+  try {
+    // Clean the URL
+    const cleanUrl = url.split('?')[0];
+    
+    // Make HTTP request with realistic headers
+    const response = await axios.get(cleanUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0'
+      },
+      timeout: 30000
+    });
+
+    const $ = cheerio.load(response.data);
+
+    // Extract title
+    let title = '';
+    const titleSelectors = ['#productTitle', 'h1[data-automation-id="product-title"]', '.product-title', 'h1'];
+    for (const selector of titleSelectors) {
+      const element = $(selector).first();
+      if (element.text().trim()) {
+        title = element.text().trim();
+        break;
+      }
+    }
+
+    if (!title) {
+      throw new Error('Could not extract product title');
+    }
+
+    // Extract price
+    let price = 0;
+    let originalPrice;
+    
+    // Current price selectors
+    const priceSelectors = [
+      '.a-price.a-text-price.a-size-medium.apexPriceToPay .a-offscreen',
+      '.a-price-whole',
+      '.a-price .a-offscreen'
+    ];
+
+    for (const selector of priceSelectors) {
+      const element = $(selector).first();
+      if (element.text()) {
+        const priceText = element.text().trim();
+        const cleanPrice = priceText.replace(/[^0-9.,]/g, '').replace(',', '');
+        const parsedPrice = parseFloat(cleanPrice) || 0;
+        if (parsedPrice > 0) {
+          price = parsedPrice;
+          break;
+        }
+      }
+    }
+
+    // Original price (if on sale)
+    const originalPriceSelectors = [
+      '.a-price.a-text-price .a-offscreen',
+      '[data-testid="list-price"] .a-price .a-offscreen'
+    ];
+
+    for (const selector of originalPriceSelectors) {
+      const element = $(selector).first();
+      if (element.text()) {
+        const priceText = element.text().trim();
+        const cleanPrice = priceText.replace(/[^0-9.,]/g, '').replace(',', '');
+        const parsedPrice = parseFloat(cleanPrice) || 0;
+        if (parsedPrice > 0 && parsedPrice !== price) {
+          originalPrice = parsedPrice;
+          break;
+        }
+      }
+    }
+
+    // Extract image
+    let image = '';
+    const imageSelectors = ['#landingImage', '.a-dynamic-image', '#imgBlkFront'];
+    for (const selector of imageSelectors) {
+      const element = $(selector).first();
+      const src = element.attr('src') || element.attr('data-old-hires');
+      if (src) {
+        image = src;
+        break;
+      }
+    }
+
+    // Extract rating
+    let rating;
+    const ratingElement = $('.a-icon-alt').first();
+    if (ratingElement.text().includes('out of 5')) {
+      const ratingMatch = ratingElement.text().match(/(\d+\.?\d*)\s*out of 5/);
+      if (ratingMatch) {
+        rating = parseFloat(ratingMatch[1]);
+      }
+    }
+
+    // Extract review count
+    let reviewCount;
+    const reviewElement = $('#acrCustomerReviewText').first();
+    if (reviewElement.text()) {
+      const reviewMatch = reviewElement.text().match(/(\d+(?:,\d+)*)/);
+      if (reviewMatch) {
+        reviewCount = parseInt(reviewMatch[1].replace(/,/g, ''));
+      }
+    }
+
+    // Extract description from bullet points
+    const features: string[] = [];
+    $('#feature-bullets ul li span').each((i, el) => {
+      if (i < 5) {
+        const text = $(el).text().trim();
+        if (text.length > 10 && !text.includes('Make sure this fits')) {
+          features.push(text);
+        }
+      }
+    });
+
+    const description = features.slice(0, 3).join('. ');
+
+    return {
+      title,
+      price,
+      originalPrice,
+      image,
+      rating,
+      reviewCount,
+      description,
+      features,
+      availability: 'in_stock' as const,
+      store: 'amazon' as const
+    };
+
+  } catch (error) {
+    console.error('Amazon fallback scraping error:', error);
+    return null;
+  }
+}
+
+async function scrapeAmazon(page: any, url: string): Promise<ScrapedProduct | null> {
+  try {
+    // Clean the URL to remove tracking parameters
+    const cleanUrl = url.split('?')[0];
+    
+    // Add random delay to appear more human
+    await new Promise(resolve => setTimeout(resolve, Math.random() * 2000 + 1000));
+    
+    // Try multiple navigation strategies
+    let navigationSuccess = false;
+    
+    // Strategy 1: Direct navigation with domcontentloaded
+    try {
+      await page.goto(cleanUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      navigationSuccess = true;
+    } catch (error) {
+      console.log('Strategy 1 failed, trying strategy 2...');
+    }
+    
+    // Strategy 2: Load with networkidle2 if first fails
+    if (!navigationSuccess) {
+      try {
+        await page.goto(cleanUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+        navigationSuccess = true;
+      } catch (error) {
+        console.log('Strategy 2 failed, trying strategy 3...');
+      }
+    }
+    
+    // Strategy 3: Basic load
+    if (!navigationSuccess) {
+      await page.goto(cleanUrl, { waitUntil: 'load', timeout: 45000 });
+    }
+    
+    // Wait a bit for dynamic content
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    // Try to wait for key elements with multiple selectors
+    try {
+      await page.waitForSelector('#productTitle, [data-testid="product-title"], h1', { timeout: 15000 });
+    } catch (error) {
+      console.log('Continuing without waiting for specific selectors...');
+    }
+
+    const product = await page.evaluate(() => {
+      // Title extraction with multiple selectors
+      const titleSelectors = [
+        '#productTitle',
+        '[data-testid="product-title"]',
+        '.product-title',
+        'h1.a-size-large',
+        'h1[data-automation-id="product-title"]'
+      ];
+      
+      let title = '';
+      for (const selector of titleSelectors) {
+        const element = document.querySelector(selector);
+        if (element?.textContent?.trim()) {
+          title = element.textContent.trim();
+          break;
+        }
+      }
+
+      // Price extraction with multiple selectors
+      const priceSelectors = [
+        '.a-price-whole',
+        '.a-price .a-offscreen',
+        '[data-testid="price"] .a-price .a-offscreen',
+        '.a-price-range .a-price .a-offscreen',
+        '.a-price.a-text-price.a-size-medium.apexPriceToPay .a-offscreen',
+        'span.a-price-symbol + span.a-price-whole'
+      ];
+
+      let price = 0;
+      let priceText = '';
+      for (const selector of priceSelectors) {
+        const element = document.querySelector(selector);
+        if (element?.textContent) {
+          priceText = element.textContent.trim();
+          break;
+        }
+      }
+
+      // Parse price
+      if (priceText) {
+        const cleanPrice = priceText.replace(/[^0-9.,]/g, '').replace(',', '');
+        price = parseFloat(cleanPrice) || 0;
+      }
+
+      // Original price (if on sale)
+      let originalPrice;
+      const originalPriceSelectors = [
+        '.a-price.a-text-price .a-offscreen',
+        '[data-testid="list-price"] .a-price .a-offscreen',
+        '.a-price.a-text-price.a-size-base .a-offscreen'
+      ];
+
+      for (const selector of originalPriceSelectors) {
+        const element = document.querySelector(selector);
+        if (element?.textContent && element.textContent !== priceText) {
+          const cleanOriginalPrice = element.textContent.replace(/[^0-9.,]/g, '').replace(',', '');
+          originalPrice = parseFloat(cleanOriginalPrice) || undefined;
+          break;
+        }
+      }
+
+      // Image extraction
+      const imageSelectors = [
+        '#landingImage',
+        '[data-testid="product-image"] img',
+        '.a-dynamic-image',
+        '#imgBlkFront',
+        'img[data-old-hires]'
+      ];
+
+      let image = '';
+      for (const selector of imageSelectors) {
+        const element = document.querySelector(selector) as HTMLImageElement;
+        if (element?.src) {
+          image = element.src;
+          break;
+        }
+        if (element?.getAttribute('data-old-hires')) {
+          image = element.getAttribute('data-old-hires') || '';
+          break;
+        }
+      }
+
+      // Rating extraction
+      let rating;
+      const ratingSelectors = [
+        '[data-testid="reviews-block"] .a-icon-alt',
+        '.a-icon-alt',
+        '.reviewCountTextLinkedHistogram .a-icon-alt',
+        'span.a-icon-alt'
+      ];
+
+      for (const selector of ratingSelectors) {
+        const element = document.querySelector(selector);
+        if (element?.textContent?.includes('out of 5')) {
+          const ratingMatch = element.textContent.match(/(\d+\.?\d*)\s*out of 5/);
+          if (ratingMatch) {
+            rating = parseFloat(ratingMatch[1]);
+            break;
+          }
+        }
+      }
+
+      // Review count extraction
+      let reviewCount;
+      const reviewSelectors = [
+        '[data-testid="reviews-block"] a[href*="#reviews"]',
+        '#acrCustomerReviewText',
+        'a[href*="#customerReviews"] span',
+        '.a-link-normal span[aria-label*="ratings"]'
+      ];
+
+      for (const selector of reviewSelectors) {
+        const element = document.querySelector(selector);
+        if (element?.textContent) {
+          const reviewMatch = element.textContent.match(/(\d+(?:,\d+)*)/);
+          if (reviewMatch) {
+            reviewCount = parseInt(reviewMatch[1].replace(/,/g, ''));
+            break;
+          }
+        }
+      }
+
+      // Description extraction
+      let description = '';
+      const descSelectors = [
+        '#feature-bullets ul li span',
+        '[data-testid="feature-bullets"] li',
+        '.a-unordered-list.a-vertical li span',
+        '#featurebullets_feature_div li span'
+      ];
+
+      const features: string[] = [];
+      for (const selector of descSelectors) {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach((el, index) => {
+          if (index < 5 && el.textContent?.trim()) { // Limit to 5 features
+            const text = el.textContent.trim();
+            if (text.length > 10 && !text.includes('Make sure this fits')) {
+              features.push(text);
+            }
+          }
+        });
+        if (features.length > 0) break;
+      }
+
+      description = features.slice(0, 3).join('. ');
+
+      // Availability
+      let availability: 'in_stock' | 'out_of_stock' | 'limited' = 'in_stock';
+      const availabilitySelectors = [
+        '#availability span',
+        '[data-testid="availability"] span',
+        '.a-size-medium.a-color-success',
+        '.a-size-medium.a-color-price'
+      ];
+
+      for (const selector of availabilitySelectors) {
+        const element = document.querySelector(selector);
+        if (element?.textContent) {
+          const text = element.textContent.toLowerCase();
+          if (text.includes('out of stock') || text.includes('unavailable')) {
+            availability = 'out_of_stock';
+          } else if (text.includes('only') && text.includes('left')) {
+            availability = 'limited';
+          }
+          break;
+        }
+      }
+
+      return {
+        title,
+        price,
+        originalPrice,
+        image,
+        rating,
+        reviewCount,
+        description,
+        features,
+        availability
+      };
+    });
+
+    if (!product.title) {
+      throw new Error('Could not extract product title');
+    }
+
+    return {
+      ...product,
+      store: 'amazon'
+    } as ScrapedProduct;
+
+  } catch (error) {
+    console.error('Amazon scraping error:', error);
+    return null;
+  }
+}
+
+async function scrapeWalmart(page: any, url: string): Promise<ScrapedProduct | null> {
+  try {
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
+    
+    // Wait for key elements to load
+    await page.waitForSelector('[data-automation-id="product-title"], h1', { timeout: 10000 });
+
+    const product = await page.evaluate(() => {
+      // Title
+      const titleSelectors = [
+        '[data-automation-id="product-title"]',
+        'h1[data-automation-id="product-title"]',
+        '.prod-ProductTitle',
+        'h1'
+      ];
+      
+      let title = '';
+      for (const selector of titleSelectors) {
+        const element = document.querySelector(selector);
+        if (element?.textContent?.trim()) {
+          title = element.textContent.trim();
+          break;
+        }
+      }
+
+      // Price
+      const priceSelectors = [
+        '[itemprop="price"]',
+        '[data-testid="price-current"]',
+        '.price-current',
+        '.price-group .price-current .price-characteristic'
+      ];
+
+      let price = 0;
+      for (const selector of priceSelectors) {
+        const element = document.querySelector(selector);
+        if (element?.textContent) {
+          const cleanPrice = element.textContent.replace(/[^0-9.,]/g, '').replace(',', '');
+          price = parseFloat(cleanPrice) || 0;
+          if (price > 0) break;
+        }
+      }
+
+      // Image
+      const imageSelectors = [
+        '.prod-hero-image-image',
+        '[data-testid="hero-image"] img',
+        '.prod-ProductImage img'
+      ];
+
+      let image = '';
+      for (const selector of imageSelectors) {
+        const element = document.querySelector(selector) as HTMLImageElement;
+        if (element?.src) {
+          image = element.src;
+          break;
+        }
+      }
+
+      // Rating
+      let rating;
+      const ratingElement = document.querySelector('.average-rating .average-rating-number');
+      if (ratingElement?.textContent) {
+        rating = parseFloat(ratingElement.textContent);
+      }
+
+      // Review count
+      let reviewCount;
+      const reviewElement = document.querySelector('.ReviewsHeader .f6');
+      if (reviewElement?.textContent) {
+        const reviewMatch = reviewElement.textContent.match(/(\d+)/);
+        if (reviewMatch) {
+          reviewCount = parseInt(reviewMatch[1]);
+        }
+      }
+
+      return {
+        title,
+        price,
+        image,
+        rating,
+        reviewCount,
+        availability: 'in_stock' as const
+      };
+    });
+
+    if (!product.title) {
+      throw new Error('Could not extract product title');
+    }
+
+    return {
+      ...product,
+      store: 'walmart'
+    } as ScrapedProduct;
+
+  } catch (error) {
+    console.error('Walmart scraping error:', error);
+    return null;
+  }
+}
+
+async function scrapeEbay(page: any, url: string): Promise<ScrapedProduct | null> {
+  try {
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
+    
+    // Wait for key elements to load
+    await page.waitForSelector('.x-item-title-label, #x-item-title', { timeout: 10000 });
+
+    const product = await page.evaluate(() => {
+      // Title
+      const titleSelectors = [
+        '.x-item-title-label',
+        '#x-item-title',
+        '.it-ttl'
+      ];
+      
+      let title = '';
+      for (const selector of titleSelectors) {
+        const element = document.querySelector(selector);
+        if (element?.textContent?.trim()) {
+          title = element.textContent.trim();
+          break;
+        }
+      }
+
+      // Price
+      const priceSelectors = [
+        '.notranslate',
+        '.u-flL.condText',
+        '.notranslate .price'
+      ];
+
+      let price = 0;
+      for (const selector of priceSelectors) {
+        const element = document.querySelector(selector);
+        if (element?.textContent?.includes('$')) {
+          const cleanPrice = element.textContent.replace(/[^0-9.,]/g, '').replace(',', '');
+          price = parseFloat(cleanPrice) || 0;
+          if (price > 0) break;
+        }
+      }
+
+      // Image
+      const imageSelectors = [
+        '#icImg',
+        '.ux-image-carousel-item img',
+        '.img img'
+      ];
+
+      let image = '';
+      for (const selector of imageSelectors) {
+        const element = document.querySelector(selector) as HTMLImageElement;
+        if (element?.src) {
+          image = element.src;
+          break;
+        }
+      }
+
+      return {
+        title,
+        price,
+        image,
+        availability: 'in_stock' as const
+      };
+    });
+
+    if (!product.title) {
+      throw new Error('Could not extract product title');
+    }
+
+    return {
+      ...product,
+      store: 'ebay'
+    } as ScrapedProduct;
+
+  } catch (error) {
+    console.error('eBay scraping error:', error);
+    return null;
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { url } = await request.json();
+
+    if (!url) {
+      return NextResponse.json(
+        { success: false, error: 'URL is required' },
+        { status: 400 }
+      );
+    }
+
+    const store = detectStore(url);
+    if (!store) {
+      return NextResponse.json(
+        { success: false, error: 'Unsupported store. Please use Amazon, Walmart, or eBay links.' },
+        { status: 400 }
+      );
+    }
+
+    // Launch browser with enhanced stealth settings
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding'
+      ]
+    });
+
+    const page = await browser.newPage();
+
+    // Enhanced stealth configuration
+    await page.evaluateOnNewDocument(() => {
+      // Remove webdriver property
+      Object.defineProperty(navigator, 'webdriver', {
+        get: () => undefined,
+      });
+
+      // Mock plugins
+      Object.defineProperty(navigator, 'plugins', {
+        get: () => [1, 2, 3, 4, 5],
+      });
+
+      // Mock languages
+      Object.defineProperty(navigator, 'languages', {
+        get: () => ['en-US', 'en'],
+      });
+
+      // Override the `chrome` property
+      window.chrome = {
+        runtime: {},
+      };
+
+      // Override permissions
+      const originalQuery = window.navigator.permissions.query;
+      window.navigator.permissions.query = (parameters) => (
+        parameters.name === 'notifications' ?
+          Promise.resolve({ state: Cypress ? 'denied' : 'granted' }) :
+          originalQuery(parameters)
+      );
+    });
+
+    // Set realistic user agent
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+    // Set realistic viewport
+    await page.setViewport({ width: 1920, height: 1080 });
+
+    // Set comprehensive headers
+    await page.setExtraHTTPHeaders({
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'DNT': '1',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Cache-Control': 'max-age=0'
+    });
+
+    let product: ScrapedProduct | null = null;
+
+    // Scrape based on store
+    switch (store) {
+      case 'amazon':
+        product = await scrapeAmazon(page, url);
+        // If Puppeteer fails, try fallback method
+        if (!product) {
+          console.log('Puppeteer failed, trying fallback method...');
+          await browser.close();
+          product = await scrapeAmazonFallback(url);
+        } else {
+          await browser.close();
+        }
+        break;
+      case 'walmart':
+        product = await scrapeWalmart(page, url);
+        await browser.close();
+        break;
+      case 'ebay':
+        product = await scrapeEbay(page, url);
+        await browser.close();
+        break;
+    }
+
+    if (!product) {
+      return NextResponse.json(
+        { success: false, error: 'Failed to extract product information. The page structure might have changed, the product may not be available, or the website is blocking our requests. Please try again later.' },
+        { status: 500 }
+      );
+    }
+
+    // Generate a unique ID for the product
+    const productId = `${store}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    return NextResponse.json({
+      success: true,
+      product: {
+        id: productId,
+        url,
+        ...product
+      }
+    });
+
+  } catch (error) {
+    console.error('Scraping error:', error);
+    return NextResponse.json(
+      { success: false, error: 'An error occurred while processing the product link. Please try again.' },
+      { status: 500 }
+    );
+  }
+}
