@@ -7,51 +7,52 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User model with authentication support
 model User {
-  id        String   @id @default(cuid())
-  name      String?
-  email     String   @unique
-  phone     String?
-  country   String?
-  password  String?  // For password-based auth
-  
-  // Auth fields
-  role               String    @default("USER")
-  emailVerified      DateTime? @map("email_verified")
-  twoFactorEnabled   Boolean   @default(false) @map("two_factor_enabled")
-  loginAttempts      Int       @default(0) @map("login_attempts")
-  lockedUntil        DateTime? @map("locked_until")
-  lastLoginAt        DateTime? @map("last_login_at")
-  
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                 String       @id @default(cuid())
+  firstName          String?      @map("first_name")
+  lastName           String?      @map("last_name")
+  email              String       @unique
+  email_lower        String?      @unique
+  phone              String?
+  country            String?
+  emailVerified      DateTime?    @map("email_verified")
+  image              String?
+  role               Role         @default(USER)
+  password           String?
+  reset_token        String?      @unique
+  reset_token_expiry DateTime?
+  two_factor_secret  String?
+  twoFactorEnabled   Boolean      @default(false) @map("two_factor_enabled")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  lastLoginAt        DateTime?    @map("last_login_at")
+  loginAttempts      Int          @default(0) @map("login_attempts")
+  lockedUntil        DateTime?    @map("locked_until")
+  accounts           Account[]
+  addresses          Address[]
+  audit_logs         audit_logs[]
+  orders             Order[]
+  sessions           Session[]
 
-  // Relations
-  orders    Order[]
-  addresses Address[]
-  accounts  Account[]
-  sessions  Session[]
-
+  @@index([email_lower])
+  @@index([reset_token])
   @@map("users")
 }
 
-// NextAuth.js required models
 model Account {
   id                String  @id @default(cuid())
   userId            String  @map("user_id")
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@map("accounts")
@@ -67,48 +68,60 @@ model Session {
   @@map("sessions")
 }
 
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("verificationtokens")
-}
-
-// Business models
 model Order {
-  id          String      @id @default(cuid())
-  userId      String      @map("user_id")
-  productUrl  String      @map("product_url")
-  productName String      @map("product_name")
-  price       Decimal     @db.Decimal(10, 2)
-  status      OrderStatus @default(PENDING)
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String            @id @default(cuid())
+  userId           String            @map("user_id")
+  productUrl       String            @map("product_url")
+  productName      String            @map("product_name")
+  price            Decimal           @db.Decimal(10, 2)
+  status           OrderStatus       @default(PENDING)
+  paymentStatus    PaymentStatus     @default(PENDING) @map("payment_status")
+  fulfillmentStatus FulfillmentStatus @default(PENDING) @map("fulfillment_status")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("orders")
 }
 
 model Address {
-  id          String  @id @default(cuid())
-  userId      String  @map("user_id")
-  name        String
-  street1     String  @map("street_1")
-  street2     String? @map("street_2")
-  city        String
-  state       String?
-  postalCode  String  @map("postal_code")
-  country     String
-  isDefault   Boolean @default(false) @map("is_default")
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String  @id @default(cuid())
+  userId     String  @map("user_id")
+  name       String
+  street1    String  @map("street_1")
+  street2    String? @map("street_2")
+  city       String
+  state      String?
+  postalCode String  @map("postal_code")
+  country    String
+  isDefault  Boolean @default(false) @map("is_default")
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("addresses")
 }
 
+model audit_logs {
+  id         String   @id
+  user_id    String?
+  action     String
+  details    Json?
+  ip_address String?
+  user_agent String?
+  created_at DateTime @default(now())
+  users      User?    @relation(fields: [user_id], references: [id])
+
+  @@index([action])
+  @@index([created_at])
+  @@index([user_id])
+}
+
+model verification_tokens {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
 
 enum OrderStatus {
   PENDING
@@ -116,4 +129,26 @@ enum OrderStatus {
   SHIPPED
   DELIVERED
   CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum FulfillmentStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum Role {
+  USER
+  ADMIN
+  VENDOR
 }

@@ -7,6 +7,7 @@ import * as argon2 from "argon2"
 import { z } from "zod"
 
 export const authConfig: NextAuthConfig = {
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     Credentials({
       name: "credentials",
@@ -48,7 +49,8 @@ export const authConfig: NextAuthConfig = {
             console.log("✅ Login successful")
             return {
               id: user.id,
-              name: user.name,
+              firstName: user.firstName,
+              lastName: user.lastName,
               email: user.email,
             }
           }
@@ -68,7 +70,7 @@ export const authConfig: NextAuthConfig = {
     updateAge: 24 * 60 * 60, // 24 hours
   },
   pages: {
-    signIn: "/auth/signin",
+    signIn: "/signin",
     signOut: "/auth/signout",
     error: "/auth/error",
     verifyRequest: "/auth/verify-request",
@@ -97,6 +99,8 @@ export const authConfig: NextAuthConfig = {
           where: { id: user.id },
           select: { 
             id: true,
+            firstName: true,
+            lastName: true,
             role: true, 
             twoFactorEnabled: true,
             emailVerified: true 
@@ -104,6 +108,8 @@ export const authConfig: NextAuthConfig = {
         })
         
         token.id = user.id
+        token.firstName = dbUser?.firstName
+        token.lastName = dbUser?.lastName
         token.role = dbUser?.role || 'USER'
         token.twoFactorEnabled = dbUser?.twoFactorEnabled || false
         token.emailVerified = dbUser?.emailVerified
@@ -122,6 +128,8 @@ export const authConfig: NextAuthConfig = {
       // Send properties to the client
       if (token) {
         session.user.id = token.id as string
+        session.user.firstName = token.firstName as string
+        session.user.lastName = token.lastName as string
         session.user.role = token.role as string
         session.user.twoFactorEnabled = token.twoFactorEnabled as boolean
         session.user.emailVerified = token.emailVerified as Date | null
@@ -134,7 +142,8 @@ export const authConfig: NextAuthConfig = {
       // Secure redirect handling
       if (url.startsWith("/")) return `${baseUrl}${url}`
       else if (new URL(url).origin === baseUrl) return url
-      return baseUrl
+      // Default redirect after successful sign-in
+      return `${baseUrl}/orders`
     }
   },
   
@@ -154,7 +163,9 @@ export const authConfig: NextAuthConfig = {
   useSecureCookies: process.env.NODE_ENV === "production",
   cookies: {
     sessionToken: {
-      name: `__Secure-next-auth.session-token`,
+      name: process.env.NODE_ENV === "production" 
+        ? `__Secure-next-auth.session-token`
+        : `next-auth.session-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
@@ -173,6 +184,8 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string
+      firstName: string
+      lastName: string
       role: string
       twoFactorEnabled: boolean
       emailVerified: Date | null

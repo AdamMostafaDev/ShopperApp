@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
 const signupSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email format"),
   phone: z.string().min(1, "Phone is required"),
   country: z.string().min(1, "Country is required"),
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
     console.log("Received signup data:", body)
     const validatedData = signupSchema.parse(body)
 
-    const { name, email, phone, country, password } = validatedData
+    const { firstName, lastName, email, phone, country, password } = validatedData
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -42,7 +43,8 @@ export async function POST(request: NextRequest) {
     // Create user
     const user = await prisma.user.create({
       data: {
-        name,
+        firstName,
+        lastName,
         email: email.toLowerCase(),
         phone,
         country,
@@ -50,7 +52,8 @@ export async function POST(request: NextRequest) {
       },
       select: {
         id: true,
-        name: true,
+        firstName: true,
+        lastName: true,
         email: true,
         phone: true,
         country: true,

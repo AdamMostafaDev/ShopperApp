@@ -105,13 +105,13 @@ export default function SimpleHeader() {
               ) : (
                 <>
                   <Link 
-                    href="/auth/signin" 
+                    href="/signin" 
                     className="text-gray-700 hover:text-blue-600 font-medium"
                   >
                     Sign In
                   </Link>
                   <Link 
-                    href="/auth/signin" 
+                    href="/signin" 
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
                   >
                     Get Started
@@ -180,13 +180,13 @@ export default function SimpleHeader() {
                 ) : (
                   <>
                     <Link 
-                      href="/auth/signin" 
+                      href="/signin" 
                       className="block text-gray-700 hover:text-blue-600 font-medium mb-3"
                     >
                       Sign In
                     </Link>
                     <Link 
-                      href="/auth/signin" 
+                      href="/signin" 
                       className="block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium text-center"
                     >
                       Get Started

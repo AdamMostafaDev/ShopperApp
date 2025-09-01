@@ -22,12 +22,16 @@ export default function SignIn() {
         email,
         password,
         redirect: false,
+        callbackUrl: '/orders',
       });
+
+      console.log('🔍 Sign-in result:', result);
 
       if (result?.error) {
         setError('Invalid email or password');
-      } else {
-        router.push('/dashboard');
+      } else if (result?.ok) {
+        console.log('🔍 Redirecting to orders...');
+        router.push('/orders');
       }
     } catch (error) {
       setError('An error occurred. Please try again.');

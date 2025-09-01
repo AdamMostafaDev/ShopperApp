@@ -31,6 +31,61 @@ function detectStore(url: string): 'amazon' | 'walmart' | 'ebay' | null {
   return null;
 }
 
+async function scrapeAmazonWithScraperAPI(url: string): Promise<ScrapedProduct | null> {
+  try {
+    const apiKey = process.env.SCRAPER_API_KEY;
+    if (!apiKey) {
+      throw new Error('ScraperAPI key not configured');
+    }
+
+    // Extract ASIN from Amazon URL
+    const asinMatch = url.match(/\/dp\/([A-Z0-9]{10})/);
+    if (!asinMatch) {
+      throw new Error('Could not extract ASIN from Amazon URL');
+    }
+    
+    const asin = asinMatch[1];
+    console.log(`Using ScraperAPI for ASIN: ${asin}`);
+
+    // Use ScraperAPI's structured Amazon product endpoint
+    const scraperUrl = `https://api.scraperapi.com/structured/amazon/product?api_key=${apiKey}&asin=${asin}`;
+    
+    const response = await fetch(scraperUrl);
+    
+    if (!response.ok) {
+      throw new Error(`ScraperAPI request failed: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data || !data.name) {
+      throw new Error('No product data returned from ScraperAPI');
+    }
+
+    // Convert ScraperAPI response to our format
+    const product: ScrapedProduct = {
+      title: data.name,
+      price: data.pricing ? parseFloat(data.pricing.replace(/[^0-9.]/g, '')) || 0 : 0,
+      originalPrice: data.list_price ? parseFloat(data.list_price.replace(/[^0-9.]/g, '')) : undefined,
+      image: data.images && data.images.length > 0 ? data.images[0] : '',
+      rating: data.average_rating ? parseFloat(data.average_rating.toString()) : undefined,
+      reviewCount: data.total_reviews ? parseInt(data.total_reviews.toString()) : undefined,
+      description: data.feature_bullets && data.feature_bullets.length > 0 ? data.feature_bullets.slice(0, 3).join('. ') : '',
+      features: data.feature_bullets || [],
+      availability: data.availability_status === 'In Stock' ? 'in_stock' : 
+                   data.availability_status === 'Out of Stock' ? 'out_of_stock' : 'limited',
+      store: 'amazon'
+    };
+
+    console.log('ScraperAPI success:', product.title);
+    return product;
+
+  } catch (error) {
+    console.error('ScraperAPI error:', error);
+    return null;
+  }
+}
+
 async function scrapeAmazonFallback(url: string): Promise<ScrapedProduct | null> {
   try {
     // Clean the URL
@@ -57,6 +112,12 @@ async function scrapeAmazonFallback(url: string): Promise<ScrapedProduct | null>
 
     const $ = cheerio.load(response.data);
 
+    // Check if we got a CAPTCHA or blocked page
+    if (response.data.includes('robot') || response.data.includes('captcha') || response.data.includes('blocked') || 
+        response.data.includes('Continue shopping') || $('title').text().trim() === 'Amazon.com') {
+      throw new Error('Amazon has blocked this request. Please try again later or use a different network connection.');
+    }
+
     // Extract title
     let title = '';
     const titleSelectors = ['#productTitle', 'h1[data-automation-id="product-title"]', '.product-title', 'h1'];
@@ -69,6 +130,7 @@ async function scrapeAmazonFallback(url: string): Promise<ScrapedProduct | null>
     }
 
     if (!title) {
+      console.log('Failed to find title with any selector');
       throw new Error('Could not extract product title');
     }
 
@@ -702,15 +764,23 @@ export async function POST(request: NextRequest) {
     // Scrape based on store
     switch (store) {
       case 'amazon':
-        product = await scrapeAmazon(page, url);
-        // If Puppeteer fails, try fallback method
+        // Try ScraperAPI first (most reliable)
+        console.log('Trying ScraperAPI first...');
+        product = await scrapeAmazonWithScraperAPI(url);
+        
+        // If ScraperAPI fails, try Puppeteer
+        if (!product) {
+          console.log('ScraperAPI failed, trying Puppeteer...');
+          product = await scrapeAmazon(page, url);
+        }
+        
+        // If both fail, try fallback HTTP method
         if (!product) {
           console.log('Puppeteer failed, trying fallback method...');
-          await browser.close();
           product = await scrapeAmazonFallback(url);
-        } else {
-          await browser.close();
         }
+        
+        await browser.close();
         break;
       case 'walmart':
         product = await scrapeWalmart(page, url);

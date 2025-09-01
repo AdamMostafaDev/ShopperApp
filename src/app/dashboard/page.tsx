@@ -7,7 +7,7 @@ export default async function Dashboard() {
   const session = await getServerSession(authConfig)
   
   if (!session) {
-    redirect('/auth/signin')
+    redirect('/signin')
   }
 
   // Get user's recent orders
