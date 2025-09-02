@@ -69,17 +69,36 @@ model Session {
 }
 
 model Order {
-  id               String            @id @default(cuid())
-  userId           String            @map("user_id")
-  productUrl       String            @map("product_url")
-  productName      String            @map("product_name")
-  price            Decimal           @db.Decimal(10, 2)
-  status           OrderStatus       @default(PENDING)
-  paymentStatus    PaymentStatus     @default(PENDING) @map("payment_status")
-  fulfillmentStatus FulfillmentStatus @default(PENDING) @map("fulfillment_status")
-  createdAt        DateTime          @default(now()) @map("created_at")
-  updatedAt        DateTime          @updatedAt @map("updated_at")
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String            @id @default(cuid())
+  userId             String            @map("user_id")
+  stripeCheckoutId   String?           @map("stripe_checkout_id")
+  stripePaymentIntentId String?        @map("stripe_payment_intent_id")
+  
+  // Cart details
+  items              Json              // Cart items with products, quantities, prices
+  subtotal           Decimal           @db.Decimal(10, 2)
+  shippingCost       Decimal           @db.Decimal(10, 2) @map("shipping_cost")
+  serviceCharge      Decimal           @db.Decimal(10, 2) @map("service_charge")
+  totalAmount        Decimal           @db.Decimal(10, 2) @map("total_amount")
+  totalWeight        Decimal           @db.Decimal(10, 3) @map("total_weight") // kg
+  
+  // Order management
+  status             OrderStatus       @default(PENDING)
+  paymentStatus      PaymentStatus     @default(PENDING) @map("payment_status")
+  fulfillmentStatus  FulfillmentStatus @default(PENDING) @map("fulfillment_status")
+  
+  // Customer info
+  customerEmail      String            @map("customer_email")
+  customerPhone      String?           @map("customer_phone")
+  shippingAddress    Json              @map("shipping_address") // Address details
+  
+  // Timestamps
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  cancelledAt        DateTime?         @map("cancelled_at")
+  refundDeadline     DateTime?         @map("refund_deadline") // 24 hours from creation
+  
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("orders")
 }

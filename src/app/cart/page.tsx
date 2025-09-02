@@ -3,10 +3,21 @@
 import { useCart } from '@/lib/cart-context';
 import { TrashIcon, MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { formatBdtPrice } from '@/lib/currency';
+import { calculateCartTotals } from '@/lib/shipping';
 
 export default function CartPage() {
   const { state, removeFromCart, updateQuantity, clearCart } = useCart();
   const { cart } = state;
+  
+  // Calculate detailed totals including shipping and service charge
+  const totals = calculateCartTotals(
+    cart.items.map(item => ({
+      price: item.product.price,
+      quantity: item.quantity,
+      weight: item.product.weight
+    }))
+  );
 
   if (cart.items.length === 0) {
     return (
@@ -81,13 +92,8 @@ export default function CartPage() {
                       </p>
                       <div className="flex items-center mt-2">
                         <span className="text-lg font-bold text-gray-900">
-                          ${item.product.price}
+{formatBdtPrice(item.product.price)}
                         </span>
-                        {item.product.originalPrice && (
-                          <span className="text-sm text-gray-500 line-through ml-2">
-                            ${item.product.originalPrice}
-                          </span>
-                        )}
                       </div>
                     </div>
 
@@ -115,7 +121,7 @@ export default function CartPage() {
                     {/* Item Total */}
                     <div className="text-right">
                       <div className="text-lg font-bold text-gray-900">
-                        ${(item.product.price * item.quantity).toFixed(2)}
+{formatBdtPrice(item.product.price * item.quantity)}
                       </div>
                       <button
                         onClick={() => removeFromCart(item.product.id)}
@@ -140,20 +146,20 @@ export default function CartPage() {
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium">${cart.total.toFixed(2)}</span>
+                  <span className="font-medium">{formatBdtPrice(totals.subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Shipping to US Address</span>
-                  <span className="font-medium">Free</span>
+                  <span className="text-gray-600">Shipping ({totals.totalWeight.toFixed(1)}kg)</span>
+                  <span className="font-medium">{formatBdtPrice(totals.shippingCost)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">International Shipping</span>
-                  <span className="font-medium">Calculated at checkout</span>
+                  <span className="text-gray-600">Service Charge </span>
+                  <span className="font-medium">{formatBdtPrice(totals.serviceCharge)}</span>
                 </div>
                 <div className="border-t border-gray-200 pt-3">
                   <div className="flex justify-between">
                     <span className="text-lg font-semibold">Total</span>
-                    <span className="text-lg font-bold">${cart.total.toFixed(2)}</span>
+                    <span className="text-lg font-bold">{formatBdtPrice(totals.total)}</span>
                   </div>
                 </div>
               </div>
@@ -169,10 +175,9 @@ export default function CartPage() {
                 Continue Shopping
               </Link>
 
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                <h3 className="font-medium text-blue-900 mb-2">Free US Shipping Address</h3>
-                <p className="text-sm text-blue-700">
-                  All items will be shipped to your US address first, then forwarded to your international location.
+              <div className="mt-6">
+                <p className="text-xs text-gray-500">
+                  Prices are estimates and may vary slightly during checkout due to real-time exchange and shipping rates.
                 </p>
               </div>
             </div>

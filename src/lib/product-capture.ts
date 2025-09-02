@@ -100,11 +100,15 @@ export async function captureProductFromUrl(url: string): Promise<ProductCapture
 
     // Transform the scraped product to match our Product interface
     const scrapedProduct = result.product;
+    console.log('🔄 Transforming scraped product, weight:', scrapedProduct.weight, 'kg');
     const product: Product = {
       id: scrapedProduct.id,
       title: scrapedProduct.title,
       price: scrapedProduct.price,
       originalPrice: scrapedProduct.originalPrice,
+      originalCurrency: scrapedProduct.originalCurrency,
+      originalPriceValue: scrapedProduct.originalPriceValue,
+      weight: scrapedProduct.weight, // Include weight field!
       image: scrapedProduct.image || '/api/placeholder/300/300',
       rating: scrapedProduct.rating || 0,
       reviewCount: scrapedProduct.reviewCount || 0,
@@ -114,6 +118,7 @@ export async function captureProductFromUrl(url: string): Promise<ProductCapture
       features: scrapedProduct.features,
       availability: scrapedProduct.availability
     };
+    console.log('✅ Transformed product, weight:', product.weight, 'kg');
 
     return {
       success: true,

@@ -40,6 +40,10 @@ function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case 'ADD_ITEM': {
       const { product, quantity = 1 } = action.payload;
+      console.log('🛍️ Adding product to cart:', product.title);
+      console.log('📦 Product weight:', product.weight, 'kg');
+      console.log('🔢 Quantity:', quantity);
+      
       const existingItemIndex = state.cart.items.findIndex(
         item => item.product.id === product.id
       );
@@ -48,6 +52,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       
       if (existingItemIndex >= 0) {
         // Update existing item quantity
+        console.log('✅ Product already in cart, updating quantity');
         newItems = state.cart.items.map((item, index) =>
           index === existingItemIndex
             ? { ...item, quantity: item.quantity + quantity }
@@ -55,6 +60,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         );
       } else {
         // Add new item
+        console.log('🆕 Adding new product to cart');
         const newItem: CartItem = {
           product,
           quantity,

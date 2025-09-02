@@ -8,6 +8,7 @@ import { StarIcon } from '@heroicons/react/24/outline';
 import { Product } from '@/types';
 import { useCart } from '@/lib/cart-context';
 import { captureProductFromUrl, isAmazonLink } from '@/lib/product-capture';
+import { formatBdtPrice, formatPriceWithOriginal } from '@/lib/currency';
 import Image from 'next/image';
 
 export default function Home() {
@@ -166,13 +167,13 @@ export default function Home() {
       )}
 
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-col space-y-1">
           <span className="text-lg font-bold text-gray-900">
-            ${product.price.toFixed(2)}
+            {formatBdtPrice(product.price)}
           </span>
-          {product.originalPrice && (
-            <span className="text-sm text-gray-500 line-through">
-              ${product.originalPrice.toFixed(2)}
+          {product.originalPriceValue && product.originalCurrency && (
+            <span className="text-xs text-gray-500">
+              ${product.originalPriceValue.toFixed(2)} {product.originalCurrency}
             </span>
           )}
         </div>

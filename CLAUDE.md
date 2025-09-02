@@ -14,6 +14,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. Only begin implementation after user confirms the approach
 4. This applies to ALL new features, components, or significant changes
 
+## Task Management Protocol
+
+**REQUIRED**: For all multi-step tasks or complex requests:
+1. **Present tasks as checklists** - Show the user a markdown checklist of all tasks to be completed
+2. **Use TodoWrite tool** - Track progress using the TodoWrite tool throughout the work
+3. **Check off tasks** - Cross off completed items in your responses as you finish them
+4. **Keep user informed** - Update the user on progress by showing the updated checklist
+
+Example format:
+```
+## Tasks to Complete:
+- [x] ~~Fix sign-in redirect issue~~
+- [x] ~~Update price display to show BDT~~
+- [ ] Add currency conversion
+- [ ] Test end-to-end functionality
+```
+
 ## Common Commands
 
 - `npm run dev` - Start development server with Turbopack
@@ -43,6 +60,12 @@ The project uses Prisma with PostgreSQL:
 - NEVER use `--force` flags on database operations
 - ALWAYS ask for explicit user consent before any destructive actions
 - When in doubt, ask the user before proceeding with any database operations
+
+**CRITICAL CODING RULE**: NEVER add default/fallback values without explicit user permission:
+- NEVER add hardcoded defaults like "1kg", "USD", etc. without being asked
+- ALWAYS ask the user what default behavior they want
+- NEVER assume what fallback values should be used
+- If data is missing, either ask the user or throw an error - don't guess
 
 ## Web Scraping & Search
 

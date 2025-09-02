@@ -11,6 +11,7 @@ import {
   MapPinIcon,
   EyeIcon
 } from '@heroicons/react/24/outline';
+import { formatBdtPrice } from '@/lib/currency';
 
 interface Order {
   id: string;
@@ -212,7 +213,7 @@ export default function OrdersPage() {
                             {getStatusBadge(order.fulfillmentStatus)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            ${order.price.toFixed(2)}
+                            {formatBdtPrice(order.price)}
                           </td>
                         </tr>
                       ))}

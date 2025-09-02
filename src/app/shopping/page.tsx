@@ -108,11 +108,6 @@ export default function ShoppingPage() {
           <span className="text-xl font-bold text-green-600">
             ${product.price.toFixed(2)}
           </span>
-          {product.originalPrice && (
-            <span className="text-sm text-gray-500 line-through">
-              ${product.originalPrice.toFixed(2)}
-            </span>
-          )}
         </div>
         <div className="flex items-center space-x-2">
           <span className={`text-xs px-2 py-1 rounded-full uppercase font-medium ${

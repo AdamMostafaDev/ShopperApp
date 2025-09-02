@@ -260,11 +260,6 @@ export default function SearchPage() {
           <span className="text-lg font-bold text-gray-900">
             ${product.price.toFixed(2)}
           </span>
-          {product.originalPrice && (
-            <span className="text-sm text-gray-500 line-through">
-              ${product.originalPrice.toFixed(2)}
-            </span>
-          )}
         </div>
         <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full uppercase font-medium">
           {product.store}

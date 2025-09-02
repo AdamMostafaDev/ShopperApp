@@ -3,11 +3,15 @@ import puppeteer from 'puppeteer';
 import UserAgent from 'user-agents';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { parsePriceFromScrapedText, convertToBdt, detectCurrency, isBdtPrice } from '@/lib/currency';
 
 interface ScrapedProduct {
   title: string;
-  price: number;
-  originalPrice?: number;
+  price: number; // BDT converted price
+  originalPrice?: number; // BDT converted original price
+  originalCurrency?: string; // USD, CAD, GBP, AUD
+  originalPriceValue?: number; // Original price before conversion
+  weight?: number; // Weight in kg for shipping calculation
   image: string;
   rating?: number;
   reviewCount?: number;
@@ -58,15 +62,77 @@ async function scrapeAmazonWithScraperAPI(url: string): Promise<ScrapedProduct |
 
     const data = await response.json();
     
+    
     if (!data || !data.name) {
       throw new Error('No product data returned from ScraperAPI');
     }
 
+    // Parse original prices and detect currency
+    const originalPriceValue = data.pricing ? parsePriceFromScrapedText(data.pricing) : 0;
+    const originalListPrice = data.list_price ? parsePriceFromScrapedText(data.list_price) : undefined;
+    const currency = detectCurrency(data.pricing || '');
+    
+    // Only convert if not already in BDT (save API costs!)
+    let bdtPrice: number;
+    let bdtOriginalPrice: number | undefined;
+    
+    if (currency === 'BDT') {
+      console.log('💰 Price already in BDT, skipping conversion');
+      bdtPrice = originalPriceValue;
+      bdtOriginalPrice = originalListPrice;
+    } else {
+      console.log(`💱 Converting ${currency} to BDT`);
+      bdtPrice = await convertToBdt(originalPriceValue, currency);
+      bdtOriginalPrice = originalListPrice ? await convertToBdt(originalListPrice, currency) : undefined;
+    }
+    
+    // Extract weight from multiple possible fields
+    let weight: number | undefined;
+    const weightSources = [
+      data.product_information?.item_weight,
+      data.product_information?.shipping_weight,
+      data.product_information?.package_weight,
+      data.item_weight,
+      data.shipping_weight,
+      data.weight
+    ];
+    
+    for (const weightSource of weightSources) {
+      if (weightSource && typeof weightSource === 'string') {
+        const weightMatch = weightSource.match(/(\d+(?:\.\d+)?)\s*(kg|kilogram|pound|lb|g|gram|oz|ounce)/i);
+        if (weightMatch) {
+          let extractedWeight = parseFloat(weightMatch[1]);
+          const unit = weightMatch[2].toLowerCase();
+          
+          // Convert to kg
+          if (unit.includes('pound') || unit.includes('lb')) {
+            extractedWeight = extractedWeight * 0.453592; // pounds to kg
+          } else if ((unit.includes('g') && !unit.includes('kg')) || unit.includes('gram')) {
+            extractedWeight = extractedWeight / 1000; // grams to kg
+          } else if (unit.includes('oz') || unit.includes('ounce')) {
+            extractedWeight = extractedWeight * 0.0283495; // ounces to kg
+          }
+          // kg and kilogram stay as is
+          
+          weight = extractedWeight;
+          console.log(`📦 Product weight: ${weight}kg (converted from ${weightMatch[0]})`);
+          break; // Found weight, stop checking other sources
+        }
+      }
+    }
+    
+    if (!weight) {
+      console.log('⚠️ No weight found in product data - will use 1kg default for shipping');
+    }
+    
     // Convert ScraperAPI response to our format
     const product: ScrapedProduct = {
       title: data.name,
-      price: data.pricing ? parseFloat(data.pricing.replace(/[^0-9.]/g, '')) || 0 : 0,
-      originalPrice: data.list_price ? parseFloat(data.list_price.replace(/[^0-9.]/g, '')) : undefined,
+      price: bdtPrice,
+      originalPrice: bdtOriginalPrice,
+      originalCurrency: currency,
+      originalPriceValue: originalPriceValue,
+      weight: weight,
       image: data.images && data.images.length > 0 ? data.images[0] : '',
       rating: data.average_rating ? parseFloat(data.average_rating.toString()) : undefined,
       reviewCount: data.total_reviews ? parseInt(data.total_reviews.toString()) : undefined,
@@ -222,10 +288,51 @@ async function scrapeAmazonFallback(url: string): Promise<ScrapedProduct | null>
 
     const description = features.slice(0, 3).join('. ');
 
+    // Extract weight from product details or shipping information
+    let weight: number | undefined;
+    const weightSelectors = [
+      '#productDetails_detailBullets_sections1 tr td span',
+      '#productDetails_techSpec_section_1 tr td',
+      '.a-list-item .a-text-bold'
+    ];
+
+    for (const selector of weightSelectors) {
+      $(selector).each((i, el) => {
+        const text = $(el).text().trim();
+        if (text.toLowerCase().includes('weight') || text.toLowerCase().includes('shipping weight')) {
+          const parent = $(el).parent();
+          const fullText = parent.text();
+          const weightMatch = fullText.match(/(\d+(?:\.\d+)?)\s*(kg|pound|lb|g|gram)/i);
+          if (weightMatch) {
+            let extractedWeight = parseFloat(weightMatch[1]);
+            const unit = weightMatch[2].toLowerCase();
+            
+            // Convert to kg
+            if (unit.includes('pound') || unit.includes('lb')) {
+              extractedWeight = extractedWeight * 0.453592; // pounds to kg
+            } else if (unit.includes('g') && !unit.includes('kg')) {
+              extractedWeight = extractedWeight / 1000; // grams to kg
+            }
+            
+            weight = extractedWeight;
+            return false; // Break the loop
+          }
+        }
+      });
+      if (weight) break;
+    }
+
+    if (!weight) {
+      console.log('⚠️ No weight found in fallback scraping');
+    } else {
+      console.log(`📦 Product weight from fallback: ${weight}kg`);
+    }
+
     return {
       title,
       price,
       originalPrice,
+      weight,
       image,
       rating,
       reviewCount,
@@ -434,6 +541,40 @@ async function scrapeAmazon(page: any, url: string): Promise<ScrapedProduct | nu
 
       description = features.slice(0, 3).join('. ');
 
+      // Extract weight from product details
+      let weight: number | undefined;
+      const weightSelectors = [
+        '#productDetails_detailBullets_sections1 tr td span',
+        '#productDetails_techSpec_section_1 tr td',
+        '.a-list-item .a-text-bold'
+      ];
+
+      for (const selector of weightSelectors) {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach((el) => {
+          const text = el.textContent?.trim() || '';
+          if (text.toLowerCase().includes('weight') || text.toLowerCase().includes('shipping weight')) {
+            const parent = el.parentElement;
+            const fullText = parent?.textContent || '';
+            const weightMatch = fullText.match(/(\d+(?:\.\d+)?)\s*(kg|pound|lb|g|gram)/i);
+            if (weightMatch) {
+              let extractedWeight = parseFloat(weightMatch[1]);
+              const unit = weightMatch[2].toLowerCase();
+              
+              // Convert to kg
+              if (unit.includes('pound') || unit.includes('lb')) {
+                extractedWeight = extractedWeight * 0.453592; // pounds to kg
+              } else if (unit.includes('g') && !unit.includes('kg')) {
+                extractedWeight = extractedWeight / 1000; // grams to kg
+              }
+              
+              weight = extractedWeight;
+            }
+          }
+        });
+        if (weight) break;
+      }
+
       // Availability
       let availability: 'in_stock' | 'out_of_stock' | 'limited' = 'in_stock';
       const availabilitySelectors = [
@@ -460,6 +601,7 @@ async function scrapeAmazon(page: any, url: string): Promise<ScrapedProduct | nu
         title,
         price,
         originalPrice,
+        weight,
         image,
         rating,
         reviewCount,
