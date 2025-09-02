@@ -79,6 +79,7 @@ model Order {
   subtotal           Decimal           @db.Decimal(10, 2)
   shippingCost       Decimal           @db.Decimal(10, 2) @map("shipping_cost")
   serviceCharge      Decimal           @db.Decimal(10, 2) @map("service_charge")
+  tax                Decimal           @db.Decimal(10, 2) @default(0)
   totalAmount        Decimal           @db.Decimal(10, 2) @map("total_amount")
   totalWeight        Decimal           @db.Decimal(10, 3) @map("total_weight") // kg
   

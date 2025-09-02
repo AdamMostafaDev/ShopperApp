@@ -57,6 +57,10 @@ export async function convertToBdt(amount: number, fromCurrency: keyof ExchangeR
 }
 
 export function formatBdtPrice(bdtPrice: number): string {
+  if (typeof bdtPrice !== 'number' || isNaN(bdtPrice)) {
+    console.warn('⚠️ formatBdtPrice received invalid value:', bdtPrice);
+    return '৳0';
+  }
   return `৳${bdtPrice.toLocaleString('en-BD')}`;
 }
 

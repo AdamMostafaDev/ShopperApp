@@ -29,6 +29,40 @@ export async function POST(request: NextRequest) {
 
   try {
     switch (event.type) {
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        
+        console.log('✅ Payment successful for Payment Intent:', paymentIntent.id);
+        
+        // Update order status
+        const orderId = paymentIntent.metadata?.orderId;
+        if (orderId) {
+          // Get shipping address from Payment Intent
+          const shippingAddress = paymentIntent.shipping?.address ? {
+            name: paymentIntent.shipping.name,
+            line1: paymentIntent.shipping.address.line1,
+            line2: paymentIntent.shipping.address.line2,
+            city: paymentIntent.shipping.address.city,
+            state: paymentIntent.shipping.address.state,
+            postal_code: paymentIntent.shipping.address.postal_code,
+            country: paymentIntent.shipping.address.country,
+          } : {};
+
+          await prisma.order.update({
+            where: { id: orderId },
+            data: {
+              paymentStatus: 'PAID',
+              status: 'PROCESSING',
+              shippingAddress: shippingAddress,
+              updatedAt: new Date()
+            }
+          });
+          
+          console.log('📦 Order updated to PROCESSING:', orderId);
+        }
+        break;
+      }
+
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         

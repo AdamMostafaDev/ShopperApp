@@ -2,12 +2,16 @@
 
 import { useCart } from '@/lib/cart-context';
 import { TrashIcon, MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { formatBdtPrice } from '@/lib/currency';
 import { calculateCartTotals } from '@/lib/shipping';
+import { useState } from 'react';
 
 export default function CartPage() {
   const { state, removeFromCart, updateQuantity, clearCart } = useCart();
+  const { data: session } = useSession();
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
   const { cart } = state;
   
   // Calculate detailed totals including shipping and service charge
@@ -18,6 +22,11 @@ export default function CartPage() {
       weight: item.product.weight
     }))
   );
+
+  const handleCheckout = async () => {
+    // Redirect to custom checkout page (no auth required)
+    window.location.href = '/checkout';
+  };
 
   if (cart.items.length === 0) {
     return (
@@ -59,127 +68,87 @@ export default function CartPage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Cart Items */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-sm">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Items ({cart.itemCount})
-                </h2>
-              </div>
-              
-              <div className="divide-y divide-gray-200">
-                {cart.items.map((item) => (
-                  <div key={item.product.id} className="p-6 flex items-center space-x-4">
-                    <div className="flex-shrink-0">
-                      <img
-                        src={item.product.image}
-                        alt={item.product.title}
-                        className="w-20 h-20 object-cover rounded-lg"
-                        onError={(e) => {
-                          e.currentTarget.src = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%23f3f4f6"/><text x="40" y="40" text-anchor="middle" dy=".3em" fill="%236b7280" font-family="Arial" font-size="12">Image</text></svg>`;
-                        }}
-                      />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-medium text-gray-900 truncate">
-                        {item.product.title}
-                      </h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {item.product.store.charAt(0).toUpperCase() + item.product.store.slice(1)}
-                      </p>
-                      <div className="flex items-center mt-2">
-                        <span className="text-lg font-bold text-gray-900">
+        <div className="max-w-4xl mx-auto">
+          {/* Single Cart Card */}
+          <div className="bg-white rounded-lg shadow-sm">
+            <div className="divide-y divide-gray-200">
+              {cart.items.map((item) => (
+                <div key={item.product.id} className="p-6 flex items-center space-x-4">
+                  <div className="flex-shrink-0">
+                    <img
+                      src={item.product.image}
+                      alt={item.product.title}
+                      className="w-20 h-20 object-cover rounded-lg"
+                      onError={(e) => {
+                        e.currentTarget.src = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%23f3f4f6"/><text x="40" y="40" text-anchor="middle" dy=".3em" fill="%236b7280" font-family="Arial" font-size="12">Image</text></svg>`;
+                      }}
+                    />
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-medium text-gray-900 truncate">
+                      {item.product.title}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {item.product.store.charAt(0).toUpperCase() + item.product.store.slice(1)}
+                    </p>
+                    <div className="flex items-center mt-2">
+                      <span className="text-lg font-bold text-gray-900">
 {formatBdtPrice(item.product.price)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Quantity Controls */}
-                    <div className="flex items-center space-x-3">
-                      <button
-                        onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                        className="p-1 rounded-full hover:bg-gray-100"
-                      >
-                        <MinusIcon className="h-4 w-4 text-gray-600" />
-                      </button>
-                      
-                      <span className="text-lg font-medium min-w-[2rem] text-center">
-                        {item.quantity}
                       </span>
-                      
-                      <button
-                        onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                        className="p-1 rounded-full hover:bg-gray-100"
-                      >
-                        <PlusIcon className="h-4 w-4 text-gray-600" />
-                      </button>
                     </div>
+                  </div>
 
-                    {/* Item Total */}
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-gray-900">
+                  {/* Quantity Controls */}
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                      className="p-1 rounded-full hover:bg-gray-100"
+                    >
+                      <MinusIcon className="h-4 w-4 text-gray-600" />
+                    </button>
+                    
+                    <span className="text-lg font-medium min-w-[2rem] text-center">
+                      {item.quantity}
+                    </span>
+                    
+                    <button
+                      onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                      className="p-1 rounded-full hover:bg-gray-100"
+                    >
+                      <PlusIcon className="h-4 w-4 text-gray-600" />
+                    </button>
+                  </div>
+
+                  {/* Item Total */}
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-gray-900">
 {formatBdtPrice(item.product.price * item.quantity)}
-                      </div>
-                      <button
-                        onClick={() => removeFromCart(item.product.id)}
-                        className="text-red-600 hover:text-red-700 mt-2"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
                     </div>
+                    <button
+                      onClick={() => removeFromCart(item.product.id)}
+                      className="text-red-600 hover:text-red-700 mt-2"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          </div>
 
-          {/* Order Summary */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Order Summary
-              </h2>
-              
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium">{formatBdtPrice(totals.subtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Shipping ({totals.totalWeight.toFixed(1)}kg)</span>
-                  <span className="font-medium">{formatBdtPrice(totals.shippingCost)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Service Charge </span>
-                  <span className="font-medium">{formatBdtPrice(totals.serviceCharge)}</span>
-                </div>
-                <div className="border-t border-gray-200 pt-3">
-                  <div className="flex justify-between">
-                    <span className="text-lg font-semibold">Total</span>
-                    <span className="text-lg font-bold">{formatBdtPrice(totals.total)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <button className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium mb-3">
-                Proceed to Checkout
-              </button>
-              
-              <Link 
-                href="/shopping" 
-                className="block w-full text-center text-blue-600 hover:text-blue-700 font-medium"
+            {/* Checkout Section */}
+            <div className="border-t border-gray-200 p-6 text-center bg-white">
+              <button 
+                onClick={handleCheckout}
+                disabled={isCheckingOut}
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Continue Shopping
-              </Link>
+                {isCheckingOut ? 'Processing...' : `Proceed to Checkout - ${formatBdtPrice(totals.subtotal)}`}
+              </button>
 
-              <div className="mt-6">
-                <p className="text-xs text-gray-500">
-                  Prices are estimates and may vary slightly during checkout due to real-time exchange and shipping rates.
-                </p>
-              </div>
+              <p className="text-xs text-gray-500">
+                Final pricing including taxes, shipping, and fees will be calculated during checkout.
+              </p>
             </div>
           </div>
         </div>

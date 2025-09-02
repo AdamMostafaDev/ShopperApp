@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { authConfig } from '@/lib/auth';
 import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
 import { calculateCartTotals } from '@/lib/shipping';
@@ -13,7 +13,7 @@ const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authConfig);
     
     if (!session?.user?.id) {
       return NextResponse.json(
