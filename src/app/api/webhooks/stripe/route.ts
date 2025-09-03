@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         // Update order status
         const orderId = paymentIntent.metadata?.orderId;
         if (orderId) {
-          // Get shipping address from Payment Intent
+          // Get shipping address and phone from Payment Intent
           const shippingAddress = paymentIntent.shipping?.address ? {
             name: paymentIntent.shipping.name,
             line1: paymentIntent.shipping.address.line1,
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
             state: paymentIntent.shipping.address.state,
             postal_code: paymentIntent.shipping.address.postal_code,
             country: paymentIntent.shipping.address.country,
+            phone: paymentIntent.shipping.phone || null, // Phone from shipping info
           } : {};
 
           await prisma.order.update({
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
               paymentStatus: 'PAID',
               status: 'PROCESSING',
               shippingAddress: shippingAddress,
+              customerPhone: paymentIntent.shipping?.phone || null, // Store phone separately too
               updatedAt: new Date()
             }
           });

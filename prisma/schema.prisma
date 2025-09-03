@@ -74,14 +74,23 @@ model Order {
   stripeCheckoutId   String?           @map("stripe_checkout_id")
   stripePaymentIntentId String?        @map("stripe_payment_intent_id")
   
-  // Cart details
+  // Cart details (all amounts in BDT)
   items              Json              // Cart items with products, quantities, prices
-  subtotal           Decimal           @db.Decimal(10, 2)
-  shippingCost       Decimal           @db.Decimal(10, 2) @map("shipping_cost")
-  serviceCharge      Decimal           @db.Decimal(10, 2) @map("service_charge")
-  tax                Decimal           @db.Decimal(10, 2) @default(0)
-  totalAmount        Decimal           @db.Decimal(10, 2) @map("total_amount")
+  productCostBdt     Decimal           @db.Decimal(10, 2) @map("product_cost_bdt") // Cost of goods in BDT
+  shippingCostBdt    Decimal           @db.Decimal(10, 2) @map("shipping_cost_bdt") 
+  serviceChargeBdt   Decimal           @db.Decimal(10, 2) @map("service_charge_bdt")
+  taxBdt             Decimal           @db.Decimal(10, 2) @default(0) @map("tax_bdt")
+  totalAmountBdt     Decimal           @db.Decimal(10, 2) @map("total_amount_bdt") // Total charged to customer (BDT)
   totalWeight        Decimal           @db.Decimal(10, 3) @map("total_weight") // kg
+  
+  // Original USD amounts (for Amazon purchasing)
+  productCostUsd     Decimal?          @db.Decimal(10, 2) @map("product_cost_usd") // Original USD product cost
+  serviceChargeUsd   Decimal?          @db.Decimal(10, 2) @map("service_charge_usd") // Service charge in USD
+  taxUsd             Decimal?          @db.Decimal(10, 2) @map("tax_usd") // Tax in USD
+  totalAmountUsd     Decimal?          @db.Decimal(10, 2) @map("total_amount_usd") // Total USD amount
+  exchangeRate       Decimal?          @db.Decimal(10, 4) @map("exchange_rate") // Rate used (USD to BDT)
+  currency           String?           @default("BDT") // Currency charged to customer
+  exchangeRateProvider String?         @default("exchange-api") @map("exchange_rate_provider")
   
   // Order management
   status             OrderStatus       @default(PENDING)
