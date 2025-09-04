@@ -57,8 +57,18 @@ export async function GET(
       paymentStatus: order.paymentStatus,
       fulfillmentStatus: order.fulfillmentStatus,
       customerEmail: order.customerEmail,
+      customerPhone: order.customerPhone,
+      shippingAddress: order.shippingAddress,
+      stripePaymentIntentId: order.stripePaymentIntentId,
+      currency: order.currency,
       createdAt: order.createdAt,
       refundDeadline: order.refundDeadline,
+      // Order tracking statuses
+      orderPlacedStatus: order.orderPlacedStatus,
+      paymentConfirmationStatus: order.paymentConfirmationStatus,
+      shippedStatus: order.shippedStatus,
+      outForDeliveryStatus: order.outForDeliveryStatus,
+      deliveredStatus: order.deliveredStatus,
     };
 
     return NextResponse.json({

@@ -119,7 +119,14 @@ export async function POST(request: NextRequest) {
         refundDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
         status: 'PENDING',
         paymentStatus: 'PENDING',
-        fulfillmentStatus: 'PENDING'
+        fulfillmentStatus: 'PENDING',
+        
+        // Order tracking statuses with defaults
+        orderPlacedStatus: 'COMPLETE',
+        paymentConfirmationStatus: 'PROCESSING', 
+        shippedStatus: 'PENDING',
+        outForDeliveryStatus: 'PENDING',
+        deliveredStatus: 'PENDING'
       }
     });
 

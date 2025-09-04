@@ -8,13 +8,8 @@ datasource db {
 }
 
 model User {
-  id                 Int          @id @default(autoincrement())
-  firstName          String?      @map("first_name")
-  lastName           String?      @map("last_name")
   email              String       @unique
   email_lower        String?      @unique
-  phone              String?
-  country            String?
   emailVerified      DateTime?    @map("email_verified")
   image              String?
   role               Role         @default(USER)
@@ -28,6 +23,11 @@ model User {
   lastLoginAt        DateTime?    @map("last_login_at")
   loginAttempts      Int          @default(0) @map("login_attempts")
   lockedUntil        DateTime?    @map("locked_until")
+  country            String?
+  phone              String?
+  firstName          String?      @map("first_name")
+  lastName           String?      @map("last_name")
+  id                 Int          @id @default(autoincrement())
   accounts           Account[]
   addresses          Address[]
   audit_logs         audit_logs[]
@@ -40,8 +40,6 @@ model User {
 }
 
 model Account {
-  id                Int     @id @default(autoincrement())
-  userId            Int     @map("user_id")
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
@@ -52,6 +50,8 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
+  id                Int     @id @default(autoincrement())
+  userId            Int     @map("user_id")
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
@@ -59,64 +59,56 @@ model Account {
 }
 
 model Session {
-  id           Int      @id @default(autoincrement())
   sessionToken String   @unique @map("session_token")
-  userId       Int      @map("user_id")
   expires      DateTime
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
 }
 
 model Order {
-  id                 Int               @id @default(autoincrement())
-  orderNumber        String            @unique // Will be generated in code as 100000, 100001, etc.
-  userId             Int               @map("user_id")
-  stripeCheckoutId   String?           @map("stripe_checkout_id")
-  stripePaymentIntentId String?        @map("stripe_payment_intent_id")
-  
-  // Cart details (all amounts in BDT)
-  items              Json              // Cart items with products, quantities, prices
-  productCostBdt     Decimal           @db.Decimal(10, 2) @map("product_cost_bdt") // Cost of goods in BDT
-  shippingCostBdt    Decimal           @db.Decimal(10, 2) @map("shipping_cost_bdt") 
-  serviceChargeBdt   Decimal           @db.Decimal(10, 2) @map("service_charge_bdt")
-  taxBdt             Decimal           @db.Decimal(10, 2) @default(0) @map("tax_bdt")
-  totalAmountBdt     Decimal           @db.Decimal(10, 2) @map("total_amount_bdt") // Total charged to customer (BDT)
-  totalWeight        Decimal           @db.Decimal(10, 3) @map("total_weight") // kg
-  
-  // Original USD amounts (for Amazon purchasing)
-  productCostUsd     Decimal?          @db.Decimal(10, 2) @map("product_cost_usd") // Original USD product cost
-  serviceChargeUsd   Decimal?          @db.Decimal(10, 2) @map("service_charge_usd") // Service charge in USD
-  taxUsd             Decimal?          @db.Decimal(10, 2) @map("tax_usd") // Tax in USD
-  totalAmountUsd     Decimal?          @db.Decimal(10, 2) @map("total_amount_usd") // Total USD amount
-  exchangeRate       Decimal?          @db.Decimal(10, 4) @map("exchange_rate") // Rate used (USD to BDT)
-  currency           String?           @default("BDT") // Currency charged to customer
-  exchangeRateProvider String?         @default("exchange-api") @map("exchange_rate_provider")
-  
-  // Order management
-  status             OrderStatus       @default(PENDING)
-  paymentStatus      PaymentStatus     @default(PENDING) @map("payment_status")
-  fulfillmentStatus  FulfillmentStatus @default(PENDING) @map("fulfillment_status")
-  
-  // Customer info
-  customerEmail      String            @map("customer_email")
-  customerPhone      String?           @map("customer_phone")
-  shippingAddress    Json              @map("shipping_address") // Address details
-  
-  // Timestamps
-  createdAt          DateTime          @default(now()) @map("created_at")
-  updatedAt          DateTime          @updatedAt @map("updated_at")
-  cancelledAt        DateTime?         @map("cancelled_at")
-  refundDeadline     DateTime?         @map("refund_deadline") // 24 hours from creation
-  
-  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status                    OrderStatus       @default(PENDING)
+  createdAt                 DateTime          @default(now()) @map("created_at")
+  updatedAt                 DateTime          @updatedAt @map("updated_at")
+  fulfillmentStatus         FulfillmentStatus @default(PENDING) @map("fulfillment_status")
+  paymentStatus             PaymentStatus     @default(PENDING) @map("payment_status")
+  cancelledAt               DateTime?         @map("cancelled_at")
+  customerEmail             String            @map("customer_email")
+  customerPhone             String?           @map("customer_phone")
+  items                     Json
+  refundDeadline            DateTime?         @map("refund_deadline")
+  shippingAddress           Json              @map("shipping_address")
+  stripeCheckoutId          String?           @map("stripe_checkout_id")
+  stripePaymentIntentId     String?           @map("stripe_payment_intent_id")
+  totalWeight               Decimal           @map("total_weight") @db.Decimal(10, 3)
+  currency                  String?           @default("BDT")
+  exchangeRate              Decimal?          @map("exchange_rate") @db.Decimal(10, 4)
+  exchangeRateProvider      String?           @default("exchange-api") @map("exchange_rate_provider")
+  totalAmountUsd            Decimal?          @map("total_amount_usd") @db.Decimal(10, 2)
+  productCostBdt            Decimal           @map("product_cost_bdt") @db.Decimal(10, 2)
+  productCostUsd            Decimal?          @map("product_cost_usd") @db.Decimal(10, 2)
+  serviceChargeBdt          Decimal           @map("service_charge_bdt") @db.Decimal(10, 2)
+  serviceChargeUsd          Decimal?          @map("service_charge_usd") @db.Decimal(10, 2)
+  shippingCostBdt           Decimal           @map("shipping_cost_bdt") @db.Decimal(10, 2)
+  taxBdt                    Decimal           @default(0) @map("tax_bdt") @db.Decimal(10, 2)
+  taxUsd                    Decimal?          @map("tax_usd") @db.Decimal(10, 2)
+  totalAmountBdt            Decimal           @map("total_amount_bdt") @db.Decimal(10, 2)
+  orderNumber               String            @unique
+  id                        Int               @id @default(autoincrement())
+  userId                    Int               @map("user_id")
+  deliveredStatus           TrackingStatus    @default(PENDING) @map("delivered_status")
+  orderPlacedStatus         TrackingStatus    @default(COMPLETE) @map("order_placed_status")
+  outForDeliveryStatus      TrackingStatus    @default(PENDING) @map("out_for_delivery_status")
+  paymentConfirmationStatus TrackingStatus    @default(PROCESSING) @map("payment_confirmation_status")
+  shippedStatus             TrackingStatus    @default(PENDING) @map("shipped_status")
+  user                      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("orders")
 }
 
 model Address {
-  id         Int     @id @default(autoincrement())
-  userId     Int     @map("user_id")
   name       String
   street1    String  @map("street_1")
   street2    String? @map("street_2")
@@ -125,19 +117,21 @@ model Address {
   postalCode String  @map("postal_code")
   country    String
   isDefault  Boolean @default(false) @map("is_default")
+  id         Int     @id @default(autoincrement())
+  userId     Int     @map("user_id")
   user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("addresses")
 }
 
 model audit_logs {
-  id         Int      @id @default(autoincrement())
-  user_id    Int?
   action     String
   details    Json?
   ip_address String?
   user_agent String?
   created_at DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  user_id    Int?
   users      User?    @relation(fields: [user_id], references: [id])
 
   @@index([action])
@@ -181,4 +175,10 @@ enum Role {
   USER
   ADMIN
   VENDOR
+}
+
+enum TrackingStatus {
+  PENDING
+  PROCESSING
+  COMPLETE
 }

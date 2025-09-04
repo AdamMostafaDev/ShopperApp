@@ -21,8 +21,17 @@ interface Order {
   paymentStatus: string;
   fulfillmentStatus: string;
   customerEmail: string;
+  customerPhone?: string;
+  shippingAddress: any;
+  stripePaymentIntentId?: string;
+  currency?: string;
   createdAt: string;
   refundDeadline: string;
+  orderPlacedStatus: 'PENDING' | 'PROCESSING' | 'COMPLETE';
+  paymentConfirmationStatus: 'PENDING' | 'PROCESSING' | 'COMPLETE';
+  shippedStatus: 'PENDING' | 'PROCESSING' | 'COMPLETE';
+  outForDeliveryStatus: 'PENDING' | 'PROCESSING' | 'COMPLETE';
+  deliveredStatus: 'PENDING' | 'PROCESSING' | 'COMPLETE';
 }
 
 export default function OrderPage() {
@@ -142,31 +151,48 @@ export default function OrderPage() {
                 {/* Order Placed */}
                 <div className="flex items-start space-x-4">
                   <div className="flex-shrink-0">
-                    <CheckCircleIcon className="h-6 w-6 text-green-500" />
+                    {order.orderPlacedStatus === 'COMPLETE' ? (
+                      <CheckCircleIcon className="h-6 w-6 text-green-500" />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full border-2 border-gray-300 flex items-center justify-center">
+                        <div className="h-2 w-2 rounded-full bg-gray-300"></div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-medium text-gray-900">Order Placed</h3>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        Complete
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        order.orderPlacedStatus === 'COMPLETE' 
+                          ? 'bg-green-100 text-green-800'
+                          : order.orderPlacedStatus === 'PROCESSING'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {order.orderPlacedStatus === 'COMPLETE' ? 'Complete' 
+                         : order.orderPlacedStatus === 'PROCESSING' ? 'Processing'
+                         : 'Pending'}
                       </span>
                     </div>
                     <p className="text-sm text-gray-500 mt-1">
-                      {new Date(order.createdAt).toLocaleDateString('en-US', { 
-                        month: 'long', 
-                        day: 'numeric',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                      {order.orderPlacedStatus === 'COMPLETE' 
+                        ? new Date(order.createdAt).toLocaleDateString('en-US', { 
+                            month: 'long', 
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })
+                        : 'Processing order placement'
+                      }
                     </p>
                   </div>
                 </div>
 
-                {/* Payment Confirmed */}
+                {/* Payment Confirmation */}
                 <div className="flex items-start space-x-4">
                   <div className="flex-shrink-0">
-                    {order.paymentStatus === 'PAID' ? (
+                    {order.paymentConfirmationStatus === 'COMPLETE' ? (
                       <CheckCircleIcon className="h-6 w-6 text-green-500" />
                     ) : (
                       <div className="h-6 w-6 rounded-full border-2 border-gray-300 flex items-center justify-center">
@@ -178,15 +204,19 @@ export default function OrderPage() {
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-medium text-gray-900">Payment Confirmation</h3>
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        order.paymentStatus === 'PAID' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-yellow-100 text-yellow-800'
+                        order.paymentConfirmationStatus === 'COMPLETE' 
+                          ? 'bg-green-100 text-green-800'
+                          : order.paymentConfirmationStatus === 'PROCESSING'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
                       }`}>
-                        {order.paymentStatus === 'PAID' ? 'Complete' : 'Processing'}
+                        {order.paymentConfirmationStatus === 'COMPLETE' ? 'Complete' 
+                         : order.paymentConfirmationStatus === 'PROCESSING' ? 'Processing'
+                         : 'Pending'}
                       </span>
                     </div>
                     <p className="text-sm text-gray-500 mt-1">
-                      {order.paymentStatus === 'PAID' 
+                      {order.paymentConfirmationStatus === 'COMPLETE' 
                         ? new Date(order.createdAt).toLocaleDateString('en-US', { 
                             month: 'long', 
                             day: 'numeric',
@@ -194,36 +224,57 @@ export default function OrderPage() {
                             hour: '2-digit',
                             minute: '2-digit'
                           })
-                        : 'Processing payment - within 24 hours'
+                        : order.paymentConfirmationStatus === 'PROCESSING'
+                        ? 'Processing payment - within 24 hours'
+                        : 'Awaiting payment confirmation'
                       }
                     </p>
                   </div>
                 </div>
 
-                {/* Preparing for Shipment */}
+                {/* Shipped Internationally */}
                 <div className="flex items-start space-x-4">
                   <div className="flex-shrink-0">
-                    <div className="h-6 w-6 rounded-full border-2 border-gray-300 flex items-center justify-center">
-                      <div className="h-2 w-2 rounded-full bg-gray-300"></div>
-                    </div>
+                    {order.shippedStatus === 'COMPLETE' ? (
+                      <CheckCircleIcon className="h-6 w-6 text-green-500" />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full border-2 border-gray-300 flex items-center justify-center">
+                        <div className="h-2 w-2 rounded-full bg-gray-300"></div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-medium text-gray-900">Shipped Internationally</h3>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        Pending
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        order.shippedStatus === 'COMPLETE' 
+                          ? 'bg-green-100 text-green-800'
+                          : order.shippedStatus === 'PROCESSING'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {order.shippedStatus === 'COMPLETE' ? 'Complete' 
+                         : order.shippedStatus === 'PROCESSING' ? 'Processing'
+                         : 'Pending'}
                       </span>
                     </div>
                     <p className="text-sm text-gray-500 mt-1">
-                      {(() => {
-                        const prepDate = new Date(order.createdAt);
-                        prepDate.setDate(prepDate.getDate() + 30);
-                        return `${prepDate.toLocaleDateString('en-US', { 
-                          month: 'long', 
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}`;
-                      })()}
+                      {order.shippedStatus === 'COMPLETE'
+                        ? new Date(order.createdAt).toLocaleDateString('en-US', { 
+                            month: 'long', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          })
+                        : (() => {
+                            const prepDate = new Date(order.createdAt);
+                            prepDate.setDate(prepDate.getDate() + 30);
+                            return `Expected ${prepDate.toLocaleDateString('en-US', { 
+                              month: 'long', 
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}`;
+                          })()
+                      }
                     </p>
                   </div>
                 </div>
@@ -231,27 +282,46 @@ export default function OrderPage() {
                 {/* Out for Delivery */}
                 <div className="flex items-start space-x-4">
                   <div className="flex-shrink-0">
-                    <div className="h-6 w-6 rounded-full border-2 border-gray-300 flex items-center justify-center">
-                      <div className="h-2 w-2 rounded-full bg-gray-300"></div>
-                    </div>
+                    {order.outForDeliveryStatus === 'COMPLETE' ? (
+                      <CheckCircleIcon className="h-6 w-6 text-green-500" />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full border-2 border-gray-300 flex items-center justify-center">
+                        <div className="h-2 w-2 rounded-full bg-gray-300"></div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-medium text-gray-900">Out for Delivery</h3>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        Pending
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        order.outForDeliveryStatus === 'COMPLETE' 
+                          ? 'bg-green-100 text-green-800'
+                          : order.outForDeliveryStatus === 'PROCESSING'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {order.outForDeliveryStatus === 'COMPLETE' ? 'Complete' 
+                         : order.outForDeliveryStatus === 'PROCESSING' ? 'Processing'
+                         : 'Pending'}
                       </span>
                     </div>
                     <p className="text-sm text-gray-500 mt-1">
-                      {(() => {
-                        const deliveryDate = new Date(order.createdAt);
-                        deliveryDate.setDate(deliveryDate.getDate() + 31);
-                        return `${deliveryDate.toLocaleDateString('en-US', { 
-                          month: 'long', 
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}`;
-                      })()}
+                      {order.outForDeliveryStatus === 'COMPLETE'
+                        ? new Date(order.createdAt).toLocaleDateString('en-US', { 
+                            month: 'long', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          })
+                        : (() => {
+                            const deliveryDate = new Date(order.createdAt);
+                            deliveryDate.setDate(deliveryDate.getDate() + 31);
+                            return `Expected ${deliveryDate.toLocaleDateString('en-US', { 
+                              month: 'long', 
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}`;
+                          })()
+                      }
                     </p>
                   </div>
                 </div>
@@ -259,35 +329,121 @@ export default function OrderPage() {
                 {/* Delivered */}
                 <div className="flex items-start space-x-4">
                   <div className="flex-shrink-0">
-                    <div className="h-6 w-6 rounded-full border-2 border-gray-300 flex items-center justify-center">
-                      <div className="h-2 w-2 rounded-full bg-gray-300"></div>
-                    </div>
+                    {order.deliveredStatus === 'COMPLETE' ? (
+                      <CheckCircleIcon className="h-6 w-6 text-green-500" />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full border-2 border-gray-300 flex items-center justify-center">
+                        <div className="h-2 w-2 rounded-full bg-gray-300"></div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-medium text-gray-900">Delivered</h3>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        Pending
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        order.deliveredStatus === 'COMPLETE' 
+                          ? 'bg-green-100 text-green-800'
+                          : order.deliveredStatus === 'PROCESSING'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {order.deliveredStatus === 'COMPLETE' ? 'Complete' 
+                         : order.deliveredStatus === 'PROCESSING' ? 'Processing'
+                         : 'Pending'}
                       </span>
                     </div>
                     <p className="text-sm text-gray-500 mt-1">
-                      {(() => {
-                        const deliveredDate = new Date(order.createdAt);
-                        deliveredDate.setDate(deliveredDate.getDate() + 31);
-                        return `${deliveredDate.toLocaleDateString('en-US', { 
-                          month: 'long', 
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}`;
-                      })()}
+                      {order.deliveredStatus === 'COMPLETE'
+                        ? new Date(order.createdAt).toLocaleDateString('en-US', { 
+                            month: 'long', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          })
+                        : (() => {
+                            const deliveredDate = new Date(order.createdAt);
+                            deliveredDate.setDate(deliveredDate.getDate() + 31);
+                            return `Expected ${deliveredDate.toLocaleDateString('en-US', { 
+                              month: 'long', 
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}`;
+                          })()
+                      }
                     </p>
                   </div>
                 </div>
               </div>
             </div>
 
-                 
+            {/* Customer Information */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-6">Customer Information</h2>
+              <div className="space-y-4">
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <p className="text-sm text-gray-900">{order.customerEmail}</p>
+                </div>
 
+                {/* Phone */}
+                {order.customerPhone && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <p className="text-sm text-gray-900">{order.customerPhone}</p>
+                  </div>
+                )}
+
+                {/* Shipping Address */}
+                {order.shippingAddress && Object.keys(order.shippingAddress).length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Address</label>
+                    <div className="text-sm text-gray-900">
+                      {order.shippingAddress.name && <p>{order.shippingAddress.name}</p>}
+                      {order.shippingAddress.line1 && <p>{order.shippingAddress.line1}</p>}
+                      {order.shippingAddress.line2 && <p>{order.shippingAddress.line2}</p>}
+                      <p>
+                        {order.shippingAddress.city && `${order.shippingAddress.city}, `}
+                        {order.shippingAddress.state && `${order.shippingAddress.state} `}
+                        {order.shippingAddress.postal_code}
+                      </p>
+                      {order.shippingAddress.country && <p>{order.shippingAddress.country}</p>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Payment Method */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-5 bg-blue-600 rounded flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">💳</span>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-900">Credit Card</p>
+                      {order.stripePaymentIntentId && (
+                        <p className="text-xs text-gray-500">Payment ID: {order.stripePaymentIntentId.slice(-8)}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Amount */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Amount</label>
+                  <div className="text-sm text-gray-900">
+                    <p className="font-semibold">{formatBdtPrice(order.totalAmount)}</p>
+                    {order.currency && order.currency !== 'BDT' && (
+                      <p className="text-xs text-gray-500">Currency: {order.currency}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Right Side - Order Items & Summary */}
+          <div className="space-y-6">
             {/* Order Items */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -325,10 +481,6 @@ export default function OrderPage() {
                 ))}
               </div>
             </div>
-          </div>
-
-          {/* Right Side - Order Summary */}
-          <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Order Summary

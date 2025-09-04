@@ -40,18 +40,44 @@ function CheckoutForm({ clientSecret, orderData }: CheckoutFormProps) {
     setIsProcessing(true);
     setErrorMessage('');
 
-    const { error } = await stripe.confirmPayment({
+    const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
         return_url: `${window.location.origin}/orders/${orderData.orderId}?success=true`,
       },
+      redirect: 'if_required', // This allows us to handle success here
     });
 
     if (error) {
       setErrorMessage(error.message || 'An error occurred during payment');
       setIsProcessing(false);
-    } else {
-      // Payment succeeded
+    } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+      // Payment succeeded - capture customer information
+      try {
+        // Get address and payment method details from Elements
+        const addressElement = elements.getElement('address');
+        const addressValue = await addressElement?.getValue();
+        
+        // Update order with real customer information
+        const updateResponse = await fetch(`/api/orders/${orderData.orderId}/update-customer-info`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            paymentIntentId: paymentIntent.id,
+            shippingAddress: addressValue?.value || null,
+          }),
+        });
+        
+        if (updateResponse.ok) {
+          console.log('✅ Customer information updated');
+        }
+      } catch (err) {
+        console.error('Error updating customer info:', err);
+      }
+      
+      // Clear cart and redirect
       clearCart();
       router.push(`/orders/${orderData.orderId}?success=true`);
     }
