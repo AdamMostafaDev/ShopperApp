@@ -42,15 +42,21 @@ export async function POST(request: NextRequest) {
 
     console.log('💰 Creating checkout session for totals:', totals);
 
+    // Get the next order number (100000 + order count)
+    const orderCount = await prisma.order.count();
+    const orderNumber = (100000 + orderCount).toString();
+
     // Create order in database first
     const order = await prisma.order.create({
       data: {
-        userId: session.user.id,
+        orderNumber,
+        userId: parseInt(session.user.id), // Convert string to int
         items: cartItems,
-        subtotal: totals.subtotal,
-        shippingCost: totals.shippingCost,
-        serviceCharge: totals.serviceCharge,
-        totalAmount: totals.total,
+        productCostBdt: totals.subtotal,
+        shippingCostBdt: totals.shippingCost,
+        serviceChargeBdt: totals.serviceCharge,
+        totalAmountBdt: totals.total,
+        taxBdt: totals.tax || 0,
         totalWeight: totals.totalWeight,
         customerEmail: customerInfo.email || session.user.email!,
         customerPhone: customerInfo.phone,
@@ -135,7 +141,7 @@ export async function POST(request: NextRequest) {
     await prisma.order.update({
       where: { id: order.id },
       data: { 
-        stripeCheckoutId: checkoutSession.id 
+        stripePaymentIntentId: checkoutSession.payment_intent as string 
       }
     });
 

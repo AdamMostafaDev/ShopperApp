@@ -8,7 +8,7 @@ datasource db {
 }
 
 model User {
-  id                 String       @id @default(cuid())
+  id                 Int          @id @default(autoincrement())
   firstName          String?      @map("first_name")
   lastName           String?      @map("last_name")
   email              String       @unique
@@ -40,8 +40,8 @@ model User {
 }
 
 model Account {
-  id                String  @id @default(cuid())
-  userId            String  @map("user_id")
+  id                Int     @id @default(autoincrement())
+  userId            Int     @map("user_id")
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
@@ -59,9 +59,9 @@ model Account {
 }
 
 model Session {
-  id           String   @id @default(cuid())
+  id           Int      @id @default(autoincrement())
   sessionToken String   @unique @map("session_token")
-  userId       String   @map("user_id")
+  userId       Int      @map("user_id")
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -69,8 +69,9 @@ model Session {
 }
 
 model Order {
-  id                 String            @id @default(cuid())
-  userId             String            @map("user_id")
+  id                 Int               @id @default(autoincrement())
+  orderNumber        String            @unique // Will be generated in code as 100000, 100001, etc.
+  userId             Int               @map("user_id")
   stripeCheckoutId   String?           @map("stripe_checkout_id")
   stripePaymentIntentId String?        @map("stripe_payment_intent_id")
   
@@ -114,8 +115,8 @@ model Order {
 }
 
 model Address {
-  id         String  @id @default(cuid())
-  userId     String  @map("user_id")
+  id         Int     @id @default(autoincrement())
+  userId     Int     @map("user_id")
   name       String
   street1    String  @map("street_1")
   street2    String? @map("street_2")
@@ -130,8 +131,8 @@ model Address {
 }
 
 model audit_logs {
-  id         String   @id
-  user_id    String?
+  id         Int      @id @default(autoincrement())
+  user_id    Int?
   action     String
   details    Json?
   ip_address String?

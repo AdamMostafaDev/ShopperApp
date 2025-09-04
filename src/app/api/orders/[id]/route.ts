@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authConfig);
@@ -19,10 +19,20 @@ export async function GET(
       );
     }
 
+    // Convert string ID to integer for database query
+    const { id } = await params;
+    const orderId = parseInt(id);
+    if (isNaN(orderId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid order ID' },
+        { status: 400 }
+      );
+    }
+
     const order = await prisma.order.findUnique({
       where: {
-        id: params.id,
-        userId: session.user.id, // Ensure user can only access their own orders
+        id: orderId,
+        userId: parseInt(session.user.id), // Convert string to int
       },
     });
 
@@ -33,9 +43,27 @@ export async function GET(
       );
     }
 
+    // Map database fields to expected format
+    const mappedOrder = {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      items: order.items,
+      subtotal: Number(order.productCostBdt),
+      shippingCost: Number(order.shippingCostBdt),
+      serviceCharge: Number(order.serviceChargeBdt),
+      tax: Number(order.taxBdt || 0),
+      totalAmount: Number(order.totalAmountBdt),
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      fulfillmentStatus: order.fulfillmentStatus,
+      customerEmail: order.customerEmail,
+      createdAt: order.createdAt,
+      refundDeadline: order.refundDeadline,
+    };
+
     return NextResponse.json({
       success: true,
-      order: order
+      order: mappedOrder
     });
 
   } catch (error) {

@@ -48,7 +48,7 @@ export const authConfig: NextAuthConfig = {
           if (passwordsMatch) {
             console.log("✅ Login successful")
             return {
-              id: user.id,
+              id: user.id.toString(), // Convert int to string for NextAuth
               firstName: user.firstName,
               lastName: user.lastName,
               email: user.email,
@@ -80,7 +80,7 @@ export const authConfig: NextAuthConfig = {
       // Check if user is locked (simplified for now)
       if (user.id) {
         const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
+          where: { id: parseInt(user.id) }, // Convert string back to int
           select: { lockedUntil: true, loginAttempts: true }
         })
         
@@ -96,7 +96,7 @@ export const authConfig: NextAuthConfig = {
       // Add user data to token on signin
       if (user) {
         const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
+          where: { id: parseInt(user.id) }, // Convert string back to int
           select: { 
             id: true,
             firstName: true,
@@ -116,7 +116,7 @@ export const authConfig: NextAuthConfig = {
 
         // Update last login time
         await prisma.user.update({
-          where: { id: user.id },
+          where: { id: parseInt(user.id) }, // Convert string back to int
           data: { lastLoginAt: new Date() }
         })
       }

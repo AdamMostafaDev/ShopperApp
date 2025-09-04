@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       rate: usdToBdtRate
     });
 
-    let userId = session?.user?.id;
+    let userId: number | null = session?.user?.id ? parseInt(session.user.id) : null;
     
     // For guest users, create a temporary guest user record
     if (isGuest) {
@@ -84,12 +84,17 @@ export async function POST(request: NextRequest) {
           role: 'USER',
         }
       });
-      userId = guestUser.id;
+      userId = guestUser.id; // Already an integer from database
     }
+
+    // Get the next order number (100000 + order count)
+    const orderCount = await prisma.order.count();
+    const orderNumber = (100000 + orderCount).toString();
 
     // Create order in database first
     const order = await prisma.order.create({
       data: {
+        orderNumber,
         userId: userId!,
         items: cartItems,
         // BDT amounts (what customer sees/pays)

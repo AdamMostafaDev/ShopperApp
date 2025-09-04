@@ -45,6 +45,20 @@ When making changes and restarting the development server:
 - Avoid running multiple instances on different ports (3001, 3002, etc.)
 - Keep development focused on the primary localhost instance
 
+## Code Quality Protocol
+
+**MANDATORY**: After making ANY code changes:
+1. **Always check for compile errors** - Use `npm run build` or check the dev server output for TypeScript/compilation errors
+2. **Never assume changes worked** - Verify the code compiles without errors before moving to the next task
+3. **Fix errors immediately** - Do not proceed with other tasks if there are compilation errors
+4. **Check related files** - When editing one file, check that related imports/exports still work
+
+**This applies especially to**:
+- API routes (route.ts files)
+- Page components (page.tsx files) 
+- TypeScript interface changes
+- Import/export modifications
+
  
 
 ## Database Management

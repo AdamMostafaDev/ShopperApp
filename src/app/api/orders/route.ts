@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userId = session.user.id;
+    const userId = parseInt(session.user.id); // Convert string to int
     
     const orders = await prisma.order.findMany({
       where: {
@@ -25,14 +25,19 @@ export async function GET(request: NextRequest) {
       },
       select: {
         id: true,
-        productName: true,
-        productUrl: true,
-        price: true,
+        orderNumber: true,
+        items: true,
+        productCostBdt: true,
+        shippingCostBdt: true,
+        serviceChargeBdt: true,
+        totalAmountBdt: true,
         status: true,
         paymentStatus: true,
         fulfillmentStatus: true,
+        customerEmail: true,
         createdAt: true,
         updatedAt: true,
+        refundDeadline: true,
       },
     });
 
