@@ -15,9 +15,12 @@ import { formatBdtPrice } from '@/lib/currency';
 
 interface Order {
   id: string;
-  productName: string;
-  productUrl: string;
-  price: number;
+  orderNumber: string;
+  items: any[];
+  productCostBdt: number;
+  shippingCostBdt: number;
+  serviceChargeBdt: number;
+  totalAmountBdt: number;
   status: string;
   paymentStatus: string;
   fulfillmentStatus: string;
@@ -179,10 +182,10 @@ export default function OrdersPage() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Order Date
+                          Order Number
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Product
+                          Order Date
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Payment Status
@@ -198,13 +201,16 @@ export default function OrdersPage() {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {orders.map((order) => (
                         <tr key={order.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Link 
+                              href={`/orders/${order.id}`}
+                              className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              #{order.orderNumber}
+                            </Link>
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {formatDate(order.createdAt)}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm font-medium text-gray-900 truncate max-w-xs">
-                              {order.productName}
-                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {getStatusBadge(order.paymentStatus)}
@@ -213,7 +219,7 @@ export default function OrdersPage() {
                             {getStatusBadge(order.fulfillmentStatus)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {formatBdtPrice(order.price)}
+                            {formatBdtPrice(order.totalAmountBdt)}
                           </td>
                         </tr>
                       ))}

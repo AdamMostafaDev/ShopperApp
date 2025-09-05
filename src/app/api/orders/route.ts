@@ -41,9 +41,18 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Convert Decimal fields to numbers for JSON serialization
+    const mappedOrders = orders.map(order => ({
+      ...order,
+      productCostBdt: Number(order.productCostBdt || 0),
+      shippingCostBdt: Number(order.shippingCostBdt || 0), 
+      serviceChargeBdt: Number(order.serviceChargeBdt || 0),
+      totalAmountBdt: Number(order.totalAmountBdt || 0)
+    }));
+
     return NextResponse.json({
-      orders: orders,
-      count: orders.length,
+      orders: mappedOrders,
+      count: mappedOrders.length,
     });
 
   } catch (error) {
