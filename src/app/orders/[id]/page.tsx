@@ -45,12 +45,8 @@ export default function OrderPage() {
   
   const isSuccess = searchParams.get('success') === 'true';
 
-  useEffect(() => {
-    if (isSuccess) {
-      // Clear cart on successful payment
-      clearCart();
-    }
-  }, [isSuccess, clearCart]);
+  // Removed cart clearing from order confirmation page
+  // Cart will be cleared only from the checkout form after successful payment
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -112,13 +108,13 @@ export default function OrderPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Success Banner */}
-        {isSuccess && order.paymentStatus === 'PAID' && (
+        {isSuccess && order.orderPlacedStatus === 'COMPLETE' && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
             <div className="flex items-center">
               <CheckCircleIcon className="h-8 w-8 text-green-500 mr-3" />
               <div>
-                <h2 className="text-lg font-semibold text-green-900">Payment Successful!</h2>
-                <p className="text-green-700">Your order has been placed and payment processed successfully.</p>
+                <h2 className="text-lg font-semibold text-green-900">Order Placed Successfully!</h2>
+                <p className="text-green-700">Your order has been placed successfully. Payment confirmation will be processed within 24 hours.</p>
               </div>
             </div>
           </div>

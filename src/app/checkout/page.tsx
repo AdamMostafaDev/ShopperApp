@@ -20,9 +20,10 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 interface CheckoutFormProps {
   clientSecret: string;
   orderData: any;
+  setPaymentSuccessful: (success: boolean) => void;
 }
 
-function CheckoutForm({ clientSecret, orderData }: CheckoutFormProps) {
+function CheckoutForm({ clientSecret, orderData, setPaymentSuccessful }: CheckoutFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const router = useRouter();
@@ -77,7 +78,8 @@ function CheckoutForm({ clientSecret, orderData }: CheckoutFormProps) {
         console.error('Error updating customer info:', err);
       }
       
-      // Clear cart and redirect
+      // Set payment successful flag, clear cart and redirect
+      setPaymentSuccessful(true);
       clearCart();
       router.push(`/orders/${orderData.orderId}?success=true`);
     }
@@ -245,6 +247,7 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [cartLoaded, setCartLoaded] = useState(false);
+  const [paymentSuccessful, setPaymentSuccessful] = useState(false);
 
   // Wait for cart to load from localStorage
   useEffect(() => {
@@ -259,7 +262,8 @@ export default function CheckoutPage() {
     // Don't check cart until it's loaded from localStorage
     if (!cartLoaded) return;
     
-    if (state.cart.items.length === 0) {
+    // Don't redirect if payment was successful
+    if (state.cart.items.length === 0 && !paymentSuccessful) {
       console.log('Cart is empty, redirecting to /cart');
       router.push('/cart');
       return;
@@ -311,7 +315,7 @@ export default function CheckoutPage() {
     };
 
     createPaymentIntent();
-  }, [cartLoaded, state.cart, router]);
+  }, [cartLoaded, state.cart, router, paymentSuccessful]);
 
   if (loading) {
     return (
@@ -365,7 +369,7 @@ export default function CheckoutPage() {
         appearance,
       }}
     >
-      <CheckoutForm clientSecret={clientSecret} orderData={orderData} />
+      <CheckoutForm clientSecret={clientSecret} orderData={orderData} setPaymentSuccessful={setPaymentSuccessful} />
     </Elements>
   );
 }

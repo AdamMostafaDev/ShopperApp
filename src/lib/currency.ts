@@ -53,7 +53,7 @@ export async function getExchangeRates(): Promise<ExchangeRates> {
 
 export async function convertToBdt(amount: number, fromCurrency: keyof ExchangeRates): Promise<number> {
   const rates = await getExchangeRates();
-  return Math.round(amount * rates[fromCurrency]);
+  return Math.round((amount * rates[fromCurrency]) * 100) / 100;
 }
 
 export function formatBdtPrice(bdtPrice: number): string {

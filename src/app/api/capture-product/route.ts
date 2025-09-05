@@ -51,10 +51,12 @@ async function scrapeAmazonWithScraperAPI(url: string): Promise<ScrapedProduct |
     const asin = asinMatch[1];
     console.log(`Using ScraperAPI for ASIN: ${asin}`);
 
-    // Use ScraperAPI's structured Amazon product endpoint
-    const scraperUrl = `https://api.scraperapi.com/structured/amazon/product?api_key=${apiKey}&asin=${asin}`;
+    // Use ScraperAPI's structured Amazon product endpoint with additional parameters for better data extraction
+    const scraperUrl = `https://api.scraperapi.com/structured/amazon/product?api_key=${apiKey}&asin=${asin}&render=true&wait_for=3&timeout=60000`;
     
-    const response = await fetch(scraperUrl);
+    const response = await fetch(scraperUrl, {
+      timeout: 90000 // 90 second timeout for the request
+    });
     
     if (!response.ok) {
       throw new Error(`ScraperAPI request failed: ${response.status} ${response.statusText}`);
@@ -910,17 +912,17 @@ export async function POST(request: NextRequest) {
         console.log('Trying ScraperAPI first...');
         product = await scrapeAmazonWithScraperAPI(url);
         
-        // If ScraperAPI fails, try Puppeteer
-        if (!product) {
-          console.log('ScraperAPI failed, trying Puppeteer...');
-          product = await scrapeAmazon(page, url);
-        }
+        // // If ScraperAPI fails, try Puppeteer
+        // if (!product) {
+        //   console.log('ScraperAPI failed, trying Puppeteer...');
+        //   product = await scrapeAmazon(page, url);
+        // }
         
-        // If both fail, try fallback HTTP method
-        if (!product) {
-          console.log('Puppeteer failed, trying fallback method...');
-          product = await scrapeAmazonFallback(url);
-        }
+        // // If both fail, try fallback HTTP method
+        // if (!product) {
+        //   console.log('Puppeteer failed, trying fallback method...');
+        //   product = await scrapeAmazonFallback(url);
+        // }
         
         await browser.close();
         break;
