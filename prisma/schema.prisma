@@ -111,13 +111,15 @@ model Order {
 model Address {
   id         Int     @id @default(autoincrement())
   userId     Int     @map("user_id")
-  name       String
+  firstName  String? @map("first_name")
+  lastName   String? @map("last_name")
   street1    String  @map("street_1")
   street2    String? @map("street_2")
   city       String
   state      String?
   postalCode String  @map("postal_code")
   country    String
+  phone      String?
   isDefault  Boolean @default(false) @map("is_default")
   user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 

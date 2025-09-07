@@ -81,6 +81,13 @@ The project uses Prisma with PostgreSQL:
 - NEVER assume what fallback values should be used
 - If data is missing, either ask the user or throw an error - don't guess
 
+**CRITICAL DATABASE AND CODE CONVENTIONS**:
+- **ID fields ALWAYS come first** in database schemas and models - this is basic database convention
+- Follow proper field ordering: ID, foreign keys, core business fields, optional fields, timestamps, relations
+- Maintain consistent naming conventions throughout the codebase
+- Follow established patterns in existing code before creating new patterns
+- Database schemas should be readable from left to right in logical order
+
 ## Web Scraping & Search
 
 The project uses a custom scraper API system for product search and data extraction:

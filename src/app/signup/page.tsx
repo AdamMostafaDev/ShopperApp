@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import countryList from 'react-select-country-list';
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -78,13 +79,13 @@ export default function SignUp() {
     }
   };
 
-  const countries = [
-    'Afghanistan', 'Albania', 'Algeria', 'Argentina', 'Australia', 'Austria', 'Bangladesh', 'Belgium', 'Brazil', 'Canada',
-    'Chile', 'China', 'Colombia', 'Denmark', 'Egypt', 'Finland', 'France', 'Germany', 'Ghana', 'Greece',
-    'India', 'Indonesia', 'Ireland', 'Italy', 'Japan', 'Kenya', 'Malaysia', 'Mexico', 'Netherlands', 'Nigeria',
-    'Norway', 'Pakistan', 'Philippines', 'Poland', 'Portugal', 'Singapore', 'South Africa', 'South Korea', 'Spain', 'Sweden',
-    'Switzerland', 'Thailand', 'Turkey', 'Ukraine', 'United Kingdom', 'Vietnam'
-  ];
+  // Get country data from react-select-country-list
+  const countryData = countryList().getData();
+  const countries = countryData.map(country => ({
+    value: country.label,
+    label: country.label,
+    code: country.value
+  }));
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -201,8 +202,8 @@ export default function SignUp() {
               >
                 <option value="">Select your country</option>
                 {countries.map((country) => (
-                  <option key={country} value={country}>
-                    {country}
+                  <option key={country.code} value={country.value}>
+                    {country.label}
                   </option>
                 ))}
               </select>

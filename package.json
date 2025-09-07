@@ -29,9 +29,11 @@
     "rate-limiter-flexible": "^7.2.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-select-country-list": "^2.2.3",
     "resend": "^6.0.1",
     "stripe": "^18.5.0",
     "user-agents": "^1.1.633",
+    "world-countries": "^5.1.0",
     "zod": "^4.0.17"
   },
   "devDependencies": {

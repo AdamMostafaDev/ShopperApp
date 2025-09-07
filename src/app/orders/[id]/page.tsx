@@ -93,7 +93,7 @@ export default function OrderPage() {
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Order Not Found</h1>
             <p className="text-gray-600 mb-6">{error || 'Unable to find the requested order.'}</p>
             <Link 
-              href="/orders"
+              href="/account"
               className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
             >
               View All Orders
@@ -512,7 +512,7 @@ export default function OrderPage() {
         {/* Action Buttons */}
         <div className="mt-8 flex justify-center space-x-4">
           <Link 
-            href="/orders"
+            href="/account"
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
             View All Orders

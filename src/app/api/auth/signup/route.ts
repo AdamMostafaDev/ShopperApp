@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await hash(password)
 
-    // Create user
+    // Create user with default address
     const user = await prisma.user.create({
       data: {
         firstName,
@@ -49,6 +49,17 @@ export async function POST(request: NextRequest) {
         phone,
         country,
         password: hashedPassword,
+        addresses: {
+          create: {
+            firstName: firstName,
+            lastName: lastName,
+            street1: "",
+            city: "", 
+            country: country,
+            postalCode: "",
+            isDefault: true
+          }
+        }
       },
       select: {
         id: true,
