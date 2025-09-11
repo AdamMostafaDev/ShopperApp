@@ -10,10 +10,10 @@ import { loadStripe } from '@stripe/stripe-js';
 import {
   Elements,
   PaymentElement,
-  AddressElement,
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
+import { ChevronRightIcon } from '@heroicons/react/24/outline';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -21,15 +21,25 @@ interface CheckoutFormProps {
   clientSecret: string;
   orderData: any;
   setPaymentSuccessful: (success: boolean) => void;
+  session: any;
 }
 
-function CheckoutForm({ clientSecret, orderData, setPaymentSuccessful }: CheckoutFormProps) {
+function CheckoutForm({ clientSecret, orderData, setPaymentSuccessful, session }: CheckoutFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const router = useRouter();
   const { clearCart } = useCart();
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [shippingAddress, setShippingAddress] = useState<any>(null);
+
+  // Load shipping address from sessionStorage
+  useEffect(() => {
+    const addressData = sessionStorage.getItem('shippingAddress');
+    if (addressData) {
+      setShippingAddress(JSON.parse(addressData));
+    }
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -91,43 +101,74 @@ function CheckoutForm({ clientSecret, orderData, setPaymentSuccessful }: Checkou
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900">Checkout</h1>
-          <p className="text-gray-600 mt-1">Complete your order</p>
+          
+          {/* Checkout Progress */}
+          <nav className="flex items-center mt-4 text-sm">
+            <button 
+              onClick={() => router.push('/cart')}
+              className="text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
+            >
+              Cart
+            </button>
+            <ChevronRightIcon className="h-4 w-4 text-gray-400 mx-2" />
+            <button 
+              onClick={() => router.push('/checkout/information')}
+              className="text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
+            >
+              Information
+            </button>
+            <ChevronRightIcon className="h-4 w-4 text-gray-400 mx-2" />
+            <span className="text-gray-900 font-medium">Payment</span>
+          </nav>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Left Side - Address & Payment */}
+            {/* Left Side - Contact & Payment */}
             <div className="space-y-6">
+              {/* Contact Information */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">Contact</h2>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/checkout/information')}
+                    className="text-sm text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
+                  >
+                    Change
+                  </button>
+                </div>
+                <p className="text-gray-700">{session?.user?.email || orderData?.customerEmail || 'guest@example.com'}</p>
+              </div>
+
               {/* Shipping Address */}
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Shipping Address
-                </h2>
-                <AddressElement
-                  options={{
-                    mode: 'shipping',
-                    fields: {
-                      phone: 'always',
-                    },
-                    validation: {
-                      phone: {
-                        required: 'always',
-                      },
-                    },
-                    defaultValues: {
-                      name: '',
-                      address: {
-                        line1: '',
-                        line2: '',
-                        city: '',
-                        state: '',
-                        postal_code: '',
-                        country: 'US',
-                      },
-                      phone: '',
-                    },
-                  }}
-                />
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">Ship to</h2>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/checkout/information')}
+                    className="text-sm text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
+                  >
+                    Change
+                  </button>
+                </div>
+                
+                {shippingAddress ? (
+                  <div className="text-gray-700">
+                    <p className="font-medium">{shippingAddress.firstName} {shippingAddress.lastName}</p>
+                    <p>{shippingAddress.street1}</p>
+                    {shippingAddress.street2 && <p>{shippingAddress.street2}</p>}
+                    <p>
+                      {shippingAddress.city}
+                      {shippingAddress.state && `, ${shippingAddress.state}`} {shippingAddress.postalCode}
+                    </p>
+                    <p>{shippingAddress.country}</p>
+                    <p className="text-sm text-gray-500 mt-1">{shippingAddress.phone}</p>
+                  </div>
+                ) : (
+                  <p className="text-gray-500">Loading address...</p>
+                )}
               </div>
 
               {/* Payment Information */}
@@ -218,7 +259,7 @@ function CheckoutForm({ clientSecret, orderData, setPaymentSuccessful }: Checkou
               <button
                 type="submit"
                 disabled={!stripe || !elements || isProcessing}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isProcessing ? 'Processing...' : `Complete Order - ${formatBdtPrice(orderData.totals.total)}`}
               </button>
@@ -241,31 +282,31 @@ export default function CheckoutPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { data: session } = useSession();
-  const { state } = useCart();
+  const { state, isInitialized } = useCart();
   const [clientSecret, setClientSecret] = useState<string>('');
   const [orderData, setOrderData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [cartLoaded, setCartLoaded] = useState(false);
   const [paymentSuccessful, setPaymentSuccessful] = useState(false);
-
-  // Wait for cart to load from localStorage
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setCartLoaded(true);
-    }, 100); // Small delay to ensure cart context has loaded
-    
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     // Don't check cart until it's loaded from localStorage
-    if (!cartLoaded) return;
+    if (!isInitialized) return;
     
     // Don't redirect if payment was successful
     if (state.cart.items.length === 0 && !paymentSuccessful) {
       console.log('Cart is empty, redirecting to /cart');
       router.push('/cart');
+      return;
+    }
+
+    // Check if shipping address is available, if not redirect to information page
+    // Only redirect if we're not already on the information page
+    const shippingAddress = sessionStorage.getItem('shippingAddress');
+    const currentPath = window.location.pathname;
+    if (!shippingAddress && !paymentSuccessful && currentPath !== '/checkout/information') {
+      console.log('No shipping address found, redirecting to information page');
+      router.push('/checkout/information');
       return;
     }
 
@@ -315,7 +356,7 @@ export default function CheckoutPage() {
     };
 
     createPaymentIntent();
-  }, [cartLoaded, state.cart, router, paymentSuccessful]);
+  }, [isInitialized, state.cart, router, paymentSuccessful]);
 
   if (loading) {
     return (
@@ -335,7 +376,7 @@ export default function CheckoutPage() {
           <p className="text-red-600 mb-4">{error}</p>
           <button
             onClick={() => router.push('/cart')}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
           >
             Back to Cart
           </button>
@@ -369,7 +410,7 @@ export default function CheckoutPage() {
         appearance,
       }}
     >
-      <CheckoutForm clientSecret={clientSecret} orderData={orderData} setPaymentSuccessful={setPaymentSuccessful} />
+      <CheckoutForm clientSecret={clientSecret} orderData={orderData} setPaymentSuccessful={setPaymentSuccessful} session={session} />
     </Elements>
   );
 }

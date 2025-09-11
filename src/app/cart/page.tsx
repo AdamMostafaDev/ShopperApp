@@ -4,13 +4,15 @@ import { useCart } from '@/lib/cart-context';
 import { TrashIcon, MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { formatBdtPrice } from '@/lib/currency';
 import { calculateCartTotals } from '@/lib/shipping';
 import { useState } from 'react';
 
 export default function CartPage() {
-  const { state, removeFromCart, updateQuantity, clearCart } = useCart();
+  const { state, removeFromCart, updateQuantity, clearCart, isInitialized } = useCart();
   const { data: session } = useSession();
+  const router = useRouter();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const { cart } = state;
   
@@ -24,9 +26,75 @@ export default function CartPage() {
   );
 
   const handleCheckout = async () => {
-    // Redirect to information page first (new checkout flow)
-    window.location.href = '/checkout/information';
+    setIsCheckingOut(true);
+    
+    // Check if user has complete address information
+    let hasCompleteAddress = false;
+    
+    if (session?.user) {
+      // For authenticated users, check if they have saved addresses
+      try {
+        const response = await fetch('/api/account/addresses');
+        if (response.ok) {
+          const data = await response.json();
+          const addresses = data.addresses || [];
+          const defaultAddress = addresses.find((addr: any) => addr.isDefault);
+          
+          // Check if default address has all required fields
+          if (defaultAddress && 
+              defaultAddress.firstName && 
+              defaultAddress.lastName && 
+              defaultAddress.street1 && 
+              defaultAddress.city && 
+              defaultAddress.state && 
+              defaultAddress.postalCode && 
+              defaultAddress.country) {
+            hasCompleteAddress = true;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking addresses:', error);
+      }
+    } else {
+      // For non-authenticated users, check session storage
+      const storedAddress = sessionStorage.getItem('shippingAddress');
+      if (storedAddress) {
+        try {
+          const address = JSON.parse(storedAddress);
+          if (address.firstName && 
+              address.lastName && 
+              address.street1 && 
+              address.city && 
+              address.state && 
+              address.postalCode && 
+              address.country) {
+            hasCompleteAddress = true;
+          }
+        } catch (error) {
+          console.error('Error parsing stored address:', error);
+        }
+      }
+    }
+    
+    // Redirect based on address completeness
+    if (hasCompleteAddress) {
+      router.push('/checkout');
+    } else {
+      router.push('/checkout/information');
+    }
   };
+
+  // Show loading while cart is initializing
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (cart.items.length === 0) {
     return (
@@ -44,7 +112,7 @@ export default function CartPage() {
               <p className="text-gray-600 mb-8">Start shopping to add items to your cart</p>
               <Link 
                 href="/shopping" 
-                className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors inline-block"
+                className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors inline-block cursor-pointer"
               >
                 Start Shopping
               </Link>
@@ -62,7 +130,7 @@ export default function CartPage() {
           <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
           <button
             onClick={clearCart}
-            className="text-red-600 hover:text-red-700 font-medium"
+            className="text-red-600 hover:text-red-700 transition-colors cursor-pointer font-medium"
           >
             Clear Cart
           </button>
@@ -127,7 +195,7 @@ export default function CartPage() {
                     </div>
                     <button
                       onClick={() => removeFromCart(item.product.id)}
-                      className="text-red-600 hover:text-red-700 mt-2"
+                      className="text-red-600 hover:text-red-700 transition-colors cursor-pointer mt-2"
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
@@ -141,7 +209,7 @@ export default function CartPage() {
               <button 
                 onClick={handleCheckout}
                 disabled={isCheckingOut}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium mb-4 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isCheckingOut ? 'Processing...' : `Proceed to Checkout - ${formatBdtPrice(totals.subtotal)}`}
               </button>

@@ -1443,31 +1443,6 @@ Full CRUD interface for managing addresses with:
 - [ ] **1.2** Checkout should default your default address, as we know in some cases default addresses can have name city but other cases a lot more information
 
 
-## Phase 2 Email Infrastructure:
-- [ ] **2.1** Sign up for Resend account and get API key
-- [ ] **2.1** Add Resend environment variables to `.env.local`
-- [ ] **2.1** TEST: Resend credentials work (send test email)
-- [ ] **2.2** Add EmailVerificationToken model to Prisma schema
-- [ ] **2.2** Update User model with emailVerificationTokens relation
-- [ ] **2.2** Run `npx prisma migrate dev --name add-email-confirmation`
-- [ ] **2.2** Run `npx prisma generate`
-- [ ] **2.2** TEST: Database migration runs without errors
-- [ ] **2.3** Install Resend package: `npm install resend`
-- [ ] **2.3** Create `src/lib/email.ts` with email service
-- [ ] **2.3** Implement `sendEmail` function with Resend
-- [ ] **2.3** Implement `generateEmailConfirmationTemplate` function
-- [ ] **2.3** TEST: Email service sends professional HTML emails
-- [ ] **2.4** Create `src/lib/email-confirmation.ts` service
-- [ ] **2.4** Implement `generateEmailConfirmationToken` function
-- [ ] **2.4** Implement `sendEmailConfirmation` function
-- [ ] **2.4** Implement `verifyEmailConfirmationToken` function
-- [ ] **2.4** TEST: Token generation, email sending, and verification works
-- [ ] **2.5** Create `src/app/api/confirm-email/route.ts`
-- [ ] **2.5** Implement GET handler for email confirmation links
-- [ ] **2.5** Add proper redirect handling with success/error states
-- [ ] **2.5** TEST: Email confirmation links work end-to-end
-- [ ] **2.6** TEST: Token expiration works (24 hours)
-- [ ] **2.6** TEST: Invalid/expired token handling works
 
 ## Phase 3 Profile Management:
 - [ ] **2.1** Create `src/app/api/account/profile/route.ts`

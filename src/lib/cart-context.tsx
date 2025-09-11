@@ -27,6 +27,7 @@ const CartContext = createContext<{
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
+  isInitialized: boolean;
 }>({
   state: initialState,
   dispatch: () => null,
@@ -34,6 +35,7 @@ const CartContext = createContext<{
   removeFromCart: () => null,
   updateQuantity: () => null,
   clearCart: () => null,
+  isInitialized: false,
 });
 
 function cartReducer(state: CartState, action: CartAction): CartState {
@@ -212,7 +214,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addToCart,
       removeFromCart,
       updateQuantity,
-      clearCart
+      clearCart,
+      isInitialized
     }}>
       {children}
     </CartContext.Provider>
