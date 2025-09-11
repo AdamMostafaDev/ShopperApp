@@ -68,7 +68,6 @@ function EditAddressForm({ address, onSave, onCancel, saving, setSaving }: EditA
     if (!country) return [];
     
     // For US, Canada, Australia - countries with states/provinces
-    const states = [];
     if (countryName === 'United States') {
       // US States
       return [
@@ -603,6 +602,7 @@ export default function AddressesPage() {
   const [saving, setSaving] = useState(false);
   const [deletingAddress, setDeletingAddress] = useState<Address | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [settingDefault, setSettingDefault] = useState<number | null>(null);
   const [errorModal, setErrorModal] = useState<{show: boolean; message: string}>({show: false, message: ''});
 
   useEffect(() => {
@@ -629,6 +629,40 @@ export default function AddressesPage() {
 
     fetchAddresses();
   }, [session]);
+
+  const handleSetDefault = async (address: Address) => {
+    setSettingDefault(address.id);
+    try {
+      const response = await fetch(`/api/account/addresses/${address.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set-default' }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.addresses) {
+          setAddresses(data.addresses);
+        } else {
+          // Fallback: just refresh the addresses from the server
+          const refreshResponse = await fetch('/api/account/addresses');
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json();
+            setAddresses(refreshData.addresses || []);
+          }
+        }
+      } else {
+        const data = await response.json();
+        console.error('Failed to set default address:', data.error);
+        setErrorModal({show: true, message: data.error || 'Failed to set default address'});
+      }
+    } catch (error) {
+      console.error('Error setting default address:', error);
+      setErrorModal({show: true, message: 'An error occurred while setting default address'});
+    } finally {
+      setSettingDefault(null);
+    }
+  };
 
   const handleDeleteAddress = async (address: Address) => {
     setDeleting(true);
@@ -759,9 +793,13 @@ export default function AddressesPage() {
                   </div>
                   
                   {!address.isDefault && (
-                    <div className="mt-3 pt-3 border-t border-gray-100">
-                      <button className="text-xs text-blue-600 hover:text-blue-700 font-medium">
-                        Set as Default
+                    <div className="mt-4 pt-3 border-t border-gray-100">
+                      <button
+                        onClick={() => handleSetDefault(address)}
+                        disabled={settingDefault === address.id}
+                        className="w-full px-4 py-2.5 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                      >
+                        {settingDefault === address.id ? 'Setting...' : 'Set as Default'}
                       </button>
                     </div>
                   )}
@@ -843,7 +881,15 @@ export default function AddressesPage() {
                   
                   <AddAddressForm 
                     onSave={(newAddress) => {
-                      setAddresses([newAddress, ...addresses]);
+                      // If new address is default, update all others to non-default
+                      if (newAddress.isDefault) {
+                        setAddresses([
+                          newAddress,
+                          ...addresses.map(addr => ({ ...addr, isDefault: false }))
+                        ]);
+                      } else {
+                        setAddresses([newAddress, ...addresses]);
+                      }
                       setShowAddForm(false);
                     }}
                     onCancel={() => setShowAddForm(false)}

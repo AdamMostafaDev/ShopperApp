@@ -24,8 +24,8 @@ export default function CartPage() {
   );
 
   const handleCheckout = async () => {
-    // Redirect to custom checkout page (no auth required)
-    window.location.href = '/checkout';
+    // Redirect to information page first (new checkout flow)
+    window.location.href = '/checkout/information';
   };
 
   if (cart.items.length === 0) {

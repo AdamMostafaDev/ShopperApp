@@ -34,8 +34,7 @@ export async function GET(request: NextRequest) {
     const addresses = await prisma.address.findMany({
       where: { userId },
       orderBy: [
-        { isDefault: 'desc' }, // Default addresses first
-        { id: 'desc' }         // Then by most recent
+        { id: 'desc' }         // Order by most recent creation
       ]
     });
 
@@ -67,23 +66,26 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = createAddressSchema.parse(body);
 
-    // If this address should be default, unset the current default
-    if (validatedData.isDefault) {
-      await prisma.address.updateMany({
-        where: { userId, isDefault: true },
-        data: { isDefault: false }
-      });
-    }
+    // Use transaction to ensure atomicity
+    const newAddress = await prisma.$transaction(async (tx) => {
+      // If this address should be default, unset all current defaults first
+      if (validatedData.isDefault) {
+        await tx.address.updateMany({
+          where: { userId, isDefault: true },
+          data: { isDefault: false }
+        });
+      }
 
-    // Create the new address
-    const newAddress = await prisma.address.create({
-      data: {
-        ...validatedData,
-        userId,
-        street2: validatedData.street2 || null,
-        state: validatedData.state || null,
-        isDefault: validatedData.isDefault || false,
-      },
+      // Create the new address
+      return await tx.address.create({
+        data: {
+          ...validatedData,
+          userId,
+          street2: validatedData.street2 || null,
+          state: validatedData.state || null,
+          isDefault: validatedData.isDefault || false,
+        },
+      });
     });
 
     return NextResponse.json({

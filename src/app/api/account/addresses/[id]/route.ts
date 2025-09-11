@@ -16,7 +16,7 @@ const updateAddressSchema = z.object({
   phone: z.string().min(1, 'Phone number is required'),
 });
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authConfig);
     
@@ -28,7 +28,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     const userId = parseInt(session.user.id);
-    const addressId = parseInt(params.id);
+    const { id } = await params;
+    const addressId = parseInt(id);
     
     if (isNaN(addressId)) {
       return NextResponse.json(
@@ -83,7 +84,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authConfig);
     
@@ -95,7 +96,90 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     const userId = parseInt(session.user.id);
-    const addressId = parseInt(params.id);
+    const { id } = await params;
+    const addressId = parseInt(id);
+    
+    if (isNaN(addressId)) {
+      return NextResponse.json(
+        { error: 'Invalid address ID' },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const { action } = body;
+
+    if (action === 'set-default') {
+      // Check if address belongs to user
+      const existingAddress = await prisma.address.findUnique({
+        where: { id: addressId },
+      });
+
+      if (!existingAddress || existingAddress.userId !== userId) {
+        return NextResponse.json(
+          { error: 'Address not found' },
+          { status: 404 }
+        );
+      }
+
+      // Use transaction to ensure atomicity
+      await prisma.$transaction(async (tx) => {
+        // First, set all user's addresses to non-default
+        await tx.address.updateMany({
+          where: { userId },
+          data: { isDefault: false },
+        });
+
+        // Then set the specified address as default
+        await tx.address.update({
+          where: { id: addressId },
+          data: { isDefault: true },
+        });
+      });
+
+      // Fetch all updated addresses to return in correct order
+      const updatedAddresses = await prisma.address.findMany({
+        where: { userId },
+        orderBy: [
+          { id: 'desc' }  // Keep original order by creation
+        ]
+      });
+
+      return NextResponse.json({
+        success: true,
+        addresses: updatedAddresses,
+        message: 'Default address updated successfully'
+      });
+    }
+
+    return NextResponse.json(
+      { error: 'Invalid action' },
+      { status: 400 }
+    );
+    
+  } catch (error) {
+    console.error('Address patch error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await getServerSession(authConfig);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const userId = parseInt(session.user.id);
+    const { id } = await params;
+    const addressId = parseInt(id);
     
     if (isNaN(addressId)) {
       return NextResponse.json(
@@ -116,21 +200,38 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       );
     }
 
-    // Don't allow deleting the only address if it's default
+    // Get all user addresses before deletion
     const userAddresses = await prisma.address.findMany({
       where: { userId },
+      orderBy: { id: 'desc' } // Most recent first
     });
 
-    if (existingAddress.isDefault && userAddresses.length === 1) {
+    if (userAddresses.length === 1) {
       return NextResponse.json(
-        { error: 'Cannot delete the only default address' },
+        { error: 'Cannot delete the only address' },
         { status: 400 }
       );
     }
 
-    // Delete address
-    await prisma.address.delete({
-      where: { id: addressId },
+    // Use transaction to handle deletion and potential default reassignment
+    await prisma.$transaction(async (tx) => {
+      // Delete the address
+      await tx.address.delete({
+        where: { id: addressId },
+      });
+
+      // If we deleted the default address, set another address as default
+      if (existingAddress.isDefault) {
+        // Find the most recent remaining address to make default
+        const remainingAddress = userAddresses.find(addr => addr.id !== addressId);
+        
+        if (remainingAddress) {
+          await tx.address.update({
+            where: { id: remainingAddress.id },
+            data: { isDefault: true }
+          });
+        }
+      }
     });
 
     return NextResponse.json({

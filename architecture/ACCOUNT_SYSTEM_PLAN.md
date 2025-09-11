@@ -1432,10 +1432,10 @@ Full CRUD interface for managing addresses with:
 - [ x] **1.9** In `/account/addresses` you should be able to add new addresses similarly as you edit it, only it should give you a new form with no information populated. 
 - [ x] **1.95** When creating new address you should have the option to make it the default address, you should have the option to make any of the ones you want as your default address.
 - [ x] **1.10** In `/account/addresses` you should be able to delete new addresses with a delete button
-- [ ] **1.10** TEST: Create an address and make sure it reaches the database with all information. Make it the default address in this example.
-- [ ] **1.11** TEST: Update an address and make sure it reaches the database with all information
-- [ ] **1.12** TEST: Delete an address and make sure it reaches the database with all information. Make sure it 
-- [ ] **1.125** Set as default doesnt work in the adresses page, also should be bigger and have hover.
+- [ x ] **1.10** TEST: Create an address and make sure it reaches the database with all information. Make it the default address in this example.
+- [ x ] **1.11** TEST: Update an address and make sure it reaches the database with all information
+- [ x ] **1.12** TEST: Delete an address and make sure it reaches the database with all information. Make sure it 
+- [ x ] **1.125** Set as default doesnt work in the adresses page, also should be bigger and have hover.
 
 
 ## Phase 1.6 Checkout Address Integration :
