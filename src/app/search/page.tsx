@@ -476,10 +476,6 @@ export default function SearchPage() {
             {(searchResults.length > 0 || capturedProducts.length > 0) && (
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">
-                    {capturedProducts.length > 0 ? 'Captured Product' : 
-                     searchQuery ? `Results for "${searchQuery}"` : 'Amazon Products'}
-                  </h2>
                   <p className="text-sm text-gray-600 mt-1">
                     {capturedProducts.length > 0 ? 
                       `${capturedProducts.length} product${capturedProducts.length > 1 ? 's' : ''} captured` :

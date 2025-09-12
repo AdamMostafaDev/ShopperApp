@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",
+    "@googlemaps/google-maps-services-js": "^3.4.2",
     "@headlessui/react": "^2.2.7",
     "@heroicons/react": "^2.2.0",
     "@prisma/client": "^6.15.0",
@@ -32,6 +33,7 @@
     "react-select-country-list": "^2.2.3",
     "resend": "^6.0.1",
     "stripe": "^18.5.0",
+    "twilio": "^5.9.0",
     "user-agents": "^1.1.633",
     "world-countries": "^5.1.0",
     "zod": "^4.0.17"

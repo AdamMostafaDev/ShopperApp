@@ -305,10 +305,6 @@ export default function Home() {
                       className="object-contain"
                     />
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    {capturedProducts.length > 0 ? 'Captured Product' : 
-                     searchQuery ? `Results for "${searchQuery}"` : 'Amazon Products'}
-                  </h2>
                 </div>
                 <p className="text-gray-600">
                   {capturedProducts.length > 0 ? 

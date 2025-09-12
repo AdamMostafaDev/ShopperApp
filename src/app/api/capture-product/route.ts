@@ -45,7 +45,7 @@ async function scrapeAmazonWithScraperAPI(url: string): Promise<ScrapedProduct |
     // Extract ASIN from Amazon URL
     const asinMatch = url.match(/\/dp\/([A-Z0-9]{10})/);
     if (!asinMatch) {
-      throw new Error('Could not extract ASIN from Amazon URL');
+      throw new Error('We were unable to process this product URL. Please verify the link is correct or contact our support team for assistance.');
     }
     
     const asin = asinMatch[1];
@@ -59,14 +59,14 @@ async function scrapeAmazonWithScraperAPI(url: string): Promise<ScrapedProduct |
     });
     
     if (!response.ok) {
-      throw new Error(`ScraperAPI request failed: ${response.status} ${response.statusText}`);
+      throw new Error('We were unable to process this product URL. Please verify the link is correct or contact our support team for assistance.');
     }
 
     const data = await response.json();
     
     
     if (!data || !data.name) {
-      throw new Error('No product data returned from ScraperAPI');
+      throw new Error('We were unable to process this product URL. Please verify the link is correct or contact our support team for assistance.');
     }
 
     // Parse original prices and detect currency
@@ -938,7 +938,7 @@ export async function POST(request: NextRequest) {
 
     if (!product) {
       return NextResponse.json(
-        { success: false, error: 'Failed to extract product information. The page structure might have changed, the product may not be available, or the website is blocking our requests. Please try again later.' },
+        { success: false, error: 'We were unable to process this product URL. Please verify the link is correct or contact our support team for assistance.' },
         { status: 500 }
       );
     }
@@ -958,7 +958,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Scraping error:', error);
     return NextResponse.json(
-      { success: false, error: 'An error occurred while processing the product link. Please try again.' },
+      { success: false, error: 'We were unable to process this product URL. Please verify the link is correct or contact our support team for assistance.' },
       { status: 500 }
     );
   }

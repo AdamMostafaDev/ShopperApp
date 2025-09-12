@@ -87,9 +87,9 @@ export async function POST(request: NextRequest) {
       userId = guestUser.id; // Already an integer from database
     }
 
-    // Get the next order number (100000 + order count)
-    const orderCount = await prisma.order.count();
-    const orderNumber = (100000 + orderCount).toString();
+    // Get next order number from database sequence
+    const result = await prisma.$queryRaw<{nextval: bigint}[]>`SELECT nextval('order_number_seq')`;
+    const orderNumber = result[0].nextval.toString();
 
     // Create order in database first
     const order = await prisma.order.create({
