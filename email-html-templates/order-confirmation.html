@@ -1,10 +1,11 @@
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Order Confirmation - Order #{{ event.order_number }}</title>
-      <!--[if mso]>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation - Order #{{ event.order_number }}</title>
+    <!--[if mso]>
       <noscript>
           <xml>
               <o:OfficeDocumentSettings>
@@ -13,237 +14,315 @@
           </xml>
       </noscript>
       <![endif]-->
-      <style>
-          /* Reset styles */
-          body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
-          table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
-          img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+    <style>
+        /* Reset styles */
+        body,
+        table,
+        td,
+        a {
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
 
-          /* Mobile styles */
-          @media screen and (max-width: 600px) {
-              .mobile-padding { padding: 20px !important; }
-              .mobile-center { text-align: center !important; }
-              .container { width: 100% !important; max-width: 100% !important; }
-              .mobile-button { width: 100% !important; }
-              .mobile-hide { display: none !important; }
-              .product-image { width: 80px !important; height: 80px !important; }
-          }
-      </style>
-  </head>
-  <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+        table,
+        td {
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }
 
-      <!-- Email Container -->
-      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4;">
-          <tr>
-              <td align="center" style="padding: 40px 0;">
+        img {
+            -ms-interpolation-mode: bicubic;
+            border: 0;
+            outline: none;
+            text-decoration: none;
+        }
 
-                  <!-- Main Content Container -->
-                  <table class="container" border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        /* Mobile styles */
+        @media screen and (max-width: 600px) {
+            .mobile-padding {
+                padding: 20px !important;
+            }
 
-                      <!-- Header -->
-                      <tr>
-                          <td align="center" style="padding: 40px 20px; background-color: #2c3e50; border-radius: 8px 8px 0 0;">
-                              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold; text-align: center;">UniShopper</h1>
-                          </td>
-                      </tr>
+            .mobile-center {
+                text-align: center !important;
+            }
 
-                      <!-- Order Confirmation Message -->
-                      <tr>
-                          <td class="mobile-padding" style="padding: 40px 40px 20px 40px;">
-                              <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                                  <tr>
-                                      <td align="center">
-                                          <h2 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 24px; text-align: center;">Thank you for your order!</h2>
-                                          <p style="color: #7f8c8d; margin: 0 0 20px 0; font-size: 16px; text-align: center;">Hi {{ event.customer_name }}, we've received your order and will begin
-  processing it right away.</p>
-                                      </td>
-                                  </tr>
-                              </table>
-                          </td>
-                      </tr>
+            .container {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
 
-                      <!-- Order Details -->
-                      <tr>
-                          <td class="mobile-padding" style="padding: 20px 40px;">
-                              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8f9fa; border-radius: 8px; padding: 20px;">
-                                  <tr>
-                                      <td style="padding: 20px;">
-                                          <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">Order Details</h3>
-                                          <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                                              <tr>
-                                                  <td style="padding: 5px 0; color: #7f8c8d;">Order Number:</td>
-                                                  <td align="right" style="padding: 5px 0; color: #2c3e50; font-weight: bold;">{{ event.order_number }}</td>
-                                              </tr>
-                                              <tr>
-                                                  <td style="padding: 5px 0; color: #7f8c8d;">Order Date:</td>
-                                                  <td align="right" style="padding: 5px 0; color: #2c3e50;">{{ event.formatted_order_date }}</td>
-                                              </tr>
-                                              <tr>
-                                                  <td style="padding: 5px 0; color: #7f8c8d;">Order Total:</td>
-                                                  <td align="right" style="padding: 5px 0; color: #2c3e50; font-weight: bold;">{{ event.formatted_total_bdt }}</td>
-                                              </tr>
-                                              <tr>
-                                                  <td style="padding: 5px 0; color: #7f8c8d;">Exchange Rate:</td>
-                                                  <td align="right" style="padding: 5px 0; color: #2c3e50;">{{ event.exchange_rate }} BDT/USD</td>
-                                              </tr>
-                                          </table>
-                                      </td>
-                                  </tr>
-                              </table>
-                          </td>
-                      </tr>
+            .mobile-button {
+                width: 100% !important;
+            }
 
-                       <!-- Order Items Section (replace the existing one) -->
-  <tr>
-      <td class="mobile-padding" style="padding: 20px 40px;">
-          <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">Order Summary</h3>
-          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            .mobile-hide {
+                display: none !important;
+            }
 
-              <!-- Product Rows -->
-              {% for item in event.items %}
-              <tr>
-                  <td style="padding: 20px 0; border-bottom: 1px solid #ecf0f1;">
-                      <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                          <tr>
-                              <td width="100" style="vertical-align: top;">
-                                  <img class="product-image" src="{{ item.product_image }}" alt="{{ item.product_name }}" style="width: 100px; height: 100px; border-radius: 8px; object-fit: cover;
+            .product-image {
+                width: 80px !important;
+                height: 80px !important;
+            }
+        }
+    </style>
+</head>
+
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+
+    <!-- Email Container -->
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+
+                <!-- Main Content Container -->
+                <table class="container" border="0" cellpadding="0" cellspacing="0" width="600"
+                    style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+                    <!-- Header -->
+                    <tr>
+                        <td align="center"
+                            style="padding: 40px 20px; background-color: #2c3e50; border-radius: 8px 8px 0 0;">
+                            <h1
+                                style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold; text-align: center;">
+                                UniShopper</h1>
+                        </td>
+                    </tr>
+
+                    <!-- Order Confirmation Message -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 40px 40px 20px 40px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <h2
+                                            style="color: #2c3e50; margin: 0 0 10px 0; font-size: 24px; text-align: center;">
+                                            Thank you for your order!</h2>
+                                        <p
+                                            style="color: #7f8c8d; margin: 0 0 20px 0; font-size: 16px; text-align: center;">
+                                            Hi {{ event.customer_name }}, we've received your order and will begin
+                                            processing it right away.</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Order Details -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%"
+                                style="background-color: #f8f9fa; border-radius: 8px; padding: 20px;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">Order Details
+                                        </h3>
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td style="padding: 5px 0; color: #7f8c8d;">Order Number:</td>
+                                                <td align="right"
+                                                    style="padding: 5px 0; color: #2c3e50; font-weight: bold;">{{
+                                                    event.order_number }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 5px 0; color: #7f8c8d;">Order Date:</td>
+                                                <td align="right" style="padding: 5px 0; color: #2c3e50;">{{
+                                                    event.formatted_order_date }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 5px 0; color: #7f8c8d;">Order Total:</td>
+                                                <td align="right"
+                                                    style="padding: 5px 0; color: #2c3e50; font-weight: bold;">{{
+                                                    event.formatted_total_bdt }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 5px 0; color: #7f8c8d;">Exchange Rate:</td>
+                                                <td align="right" style="padding: 5px 0; color: #2c3e50;">{{
+                                                    event.exchange_rate }} BDT/USD</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Order Items Section (replace the existing one) -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px;">
+                            <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">Order Summary</h3>
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+
+                                <!-- Product Rows -->
+                                {% for item in event.items %}
+                                <tr>
+                                    <td style="padding: 20px 0; border-bottom: 1px solid #ecf0f1;">
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td width="100" style="vertical-align: top;">
+                                                    <img class="product-image" src="{{ item.product_image }}"
+                                                        alt="{{ item.product_name }}" style="width: 100px; height: 100px; border-radius: 8px; object-fit: cover;
   display: block;">
-                              </td>
-                              <td style="padding-left: 20px; vertical-align: top;">
-                                  <h4 style="color: #2c3e50; margin: 0 0 8px 0; font-size: 16px; line-height: 1.4;">{{ item.product_name }}</h4>
-                                  <p style="color: #7f8c8d; margin: 0 0 6px 0; font-size: 14px;">
-                                      Qty: {{ item.quantity }} × ৳{{ item.price_bdt }}
-                                  </p>
-                                  <p style="color: #95a5a6; margin: 0 0 6px 0; font-size: 12px;">Store: {{ item.store|title }}</p>
-                                  <p style="color: #95a5a6; margin: 0; font-size: 12px;">USD Price: ${{ item.price_usd }}</p>
-                              </td>
-                              <td align="right" style="vertical-align: top; padding-left: 15px;">
-                                  <p style="color: #27ae60; margin: 0; font-size: 18px; font-weight: bold;">৳{{ item.price_bdt }}</p>
-                              </td>
-                          </tr>
-                      </table>
-                  </td>
-              </tr>
-              {% endfor %}
+                                                </td>
+                                                <td style="padding-left: 20px; vertical-align: top;">
+                                                    <h4
+                                                        style="color: #2c3e50; margin: 0 0 8px 0; font-size: 16px; line-height: 1.4;">
+                                                        {{ item.product_name }}</h4>
+                                                    <p style="color: #7f8c8d; margin: 0 0 6px 0; font-size: 14px;">
+                                                        Qty: {{ item.quantity }} × ৳{{ item.price_bdt }}
+                                                    </p>
+                                                    <p style="color: #95a5a6; margin: 0 0 6px 0; font-size: 12px;">
+                                                        Store: {{ item.store|title }}</p>
+                                                    <p style="color: #95a5a6; margin: 0; font-size: 12px;">USD Price:
+                                                        ${{ item.price_usd }}</p>
+                                                </td>
+                                                <td align="right" style="vertical-align: top; padding-left: 15px;">
+                                                    <p
+                                                        style="color: #27ae60; margin: 0; font-size: 18px; font-weight: bold;">
+                                                        ৳{{ item.price_bdt }}</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                {% endfor %}
 
-          </table>
+                            </table>
 
-          <!-- Simple Price Note -->
-          <p style="color: #95a5a6; margin: 15px 0 0 0; font-size: 12px; text-align: center; font-style: italic;">
-             Final prices may vary based on current market rates and will be confirmed before payment processing.
-          </p>
+                            <!-- Order Totals -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td style="padding: 8px 0;">Subtotal:</td>
+                                    <td align="right" style="padding: 8px 0;">৳{{ event.subtotal_bdt }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0;">Service Charge:</td>
+                                    <td align="right" style="padding: 8px 0;">৳{{ event.service_charge_bdt }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0;">Tax:</td>
+                                    <td align="right" style="padding: 8px 0;">৳{{ event.tax_bdt }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0;">Shipping:</td>
+                                    <td align="right" style="padding: 8px 0; color: #27ae60;">TBD (within 24hrs)</td>
+                                </tr>
+                                <tr style="border-top: 2px solid #ecf0f1;">
+                                    <td
+                                        style="padding: 12px 0 8px 0; font-size: 18px; font-weight: bold; color: #2c3e50;">
+                                        Total:</td>
+                                    <td align="right"
+                                        style="padding: 12px 0 8px 0; font-size: 18px; font-weight: bold; color: #2c3e50;">
+                                        {{ event.formatted_total_bdt }}</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="2" align="right"
+                                        style="padding: 5px 0; color: #7f8c8d; font-size: 14px;">
+                                        USD Total: {{ event.formatted_total_usd }}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
 
-      </td>
-  </tr>
 
-                      <!-- Order Totals -->
-                      <tr>
-                          <td class="mobile-padding" style="padding: 20px 40px;">
-                              <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                                  <tr>
-                                      <td style="padding: 8px 0;">Subtotal:</td>
-                                      <td align="right" style="padding: 8px 0;">৳{{ event.subtotal_bdt }}</td>
-                                  </tr>
-                                  <tr>
-                                      <td style="padding: 8px 0;">Service Charge:</td>
-                                      <td align="right" style="padding: 8px 0;">৳{{ event.service_charge_bdt }}</td>
-                                  </tr>
-                                  <tr>
-                                      <td style="padding: 8px 0;">Tax:</td>
-                                      <td align="right" style="padding: 8px 0;">৳{{ event.tax_bdt }}</td>
-                                  </tr>
-                                  <tr>
-                                      <td style="padding: 8px 0;">Shipping:</td>
-                                      <td align="right" style="padding: 8px 0; color: #27ae60;">TBD (within 24hrs)</td>
-                                  </tr>
-                                  <tr style="border-top: 2px solid #ecf0f1;">
-                                      <td style="padding: 12px 0 8px 0; font-size: 18px; font-weight: bold; color: #2c3e50;">Total:</td>
-                                      <td align="right" style="padding: 12px 0 8px 0; font-size: 18px; font-weight: bold; color: #2c3e50;">{{ event.formatted_total_bdt }}</td>
-                                  </tr>
-                                  <tr>
-                                      <td colspan="2" align="right" style="padding: 5px 0; color: #7f8c8d; font-size: 14px;">
-                                          USD Total: {{ event.formatted_total_usd }}
-                                      </td>
-                                  </tr>
-                              </table>
-                          </td>
-                      </tr>
+                    <!-- Shipping Information -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%"
+                                style="background-color: #f8f9fa; border-radius: 8px; padding: 20px;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">Shipping
+                                            Information</h3>
 
-                 
-                      <!-- Customer Info -->
-  <tr>
-      <td class="mobile-padding" style="padding: 20px 40px;">
-          <table border="0" cellpadding="0" cellspacing="0" width="100%">
-              <tr>
-                  <td width="48%" valign="top">
-                      <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 16px;">Customer Information</h4>
-                      <p style="color: #7f8c8d; margin: 0; font-size: 14px; line-height: 1.6;">
-                  {{ event.customer_address|safe }}<br>
-Phone: {{ event.customer_phone }}
-                      </p>
-                  </td>
-                  <td width="4%"></td>
-                  <td width="48%" valign="top">
-                      <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 16px;">What's Next</h4>
-                      <p style="color: #7f8c8d; margin: 0; font-size: 14px; line-height: 1.6;">
-                          • Shipping quote within 24 hours<br>
-                          • Order processing confirmation<br>
-                          • Payment and delivery details<br>
-                          • Order tracking updates
-                      </p>
-                  </td>
-              </tr>
-          </table>
-      </td>
-  </tr>
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td width="50%" valign="top" style="padding-right: 20px;">
+                                                    <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 16px;">
+                                                        Contact Information</h4>
+                                                    <p
+                                                        style="color: #2c3e50; margin: 0; font-size: 14px; line-height: 1.6;">
+                                                        {{ event.customer_email }}<br>
+                                                        {{ event.customer_phone }}
+                                                    </p>
+                                                </td>
+                                                <td width="50%" valign="top" style="padding-left: 20px;">
+                                                    <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 16px;">
+                                                        Delivery Address</h4>
+                                                    <p
+                                                        style="color: #2c3e50; margin: 0; font-size: 14px; line-height: 1.6;">
+                                                        {{ event.customer_address|safe }}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
 
-                      <!-- CTA Buttons -->
-                      <tr>
-                          <td align="center" class="mobile-padding" style="padding: 30px 40px;">
-                              <table border="0" cellspacing="0" cellpadding="0">
-                                  <tr>
-                                      <td align="center">
-                                          <a href="{{ organization.url }}/account/orders/{{ event.order_number }}" style="display: inline-block; padding: 14px 30px; background-color: #3498db; color:
+                                        <p
+                                            style="color: #7f8c8d; margin: 15px 0 0 0; font-size: 12px; text-align: center;">
+                                            📦 Your order will be processed within 24 hours and final prices will be
+                                            calculated based on current rates
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <!-- CTA Buttons -->
+                    <tr>
+                        <td align="center" class="mobile-padding" style="padding: 30px 40px;">
+                            <table border="0" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{{ organization.url }}/account/orders/{{ event.order_number }}" style="display: inline-block; padding: 14px 30px; background-color: #3498db; color:
   #ffffff; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold;">View Order Status</a>
-                                      </td>
-                                  </tr>
-                              </table>
-                          </td>
-                      </tr>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
 
-                      <!-- Footer -->
-                      <tr>
-                          <td style="padding: 30px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
-                              <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                                  <tr>
-                                      <td align="center" style="padding-bottom: 20px;">
-                                          <p style="color: #7f8c8d; margin: 0 0 10px 0; font-size: 14px;">
-                                              Questions about your order? We're here to help!
-                                          </p>
-                                          <a href="mailto:support@unishopper.com" style="color: #3498db; text-decoration: none; font-size: 14px;">Contact Support</a>
-                                      </td>
-                                  </tr>
-                                  <tr>
-                                      <td align="center" style="padding-top: 20px; border-top: 1px solid #dee2e6;">
-                                          <p style="color: #95a5a6; margin: 0; font-size: 12px;">
-                                              © 2024 UniShopper. All rights reserved.<br>
-                                              International Shopping Service - Dhaka, Bangladesh
-                                          </p>
-                                          <p style="color: #95a5a6; margin: 10px 0 0 0; font-size: 12px;">
-                                              <a href="{{ unsubscribe_link }}" style="color: #95a5a6; text-decoration: underline;">Unsubscribe</a> |
-                                              <a href="{{ manage_preferences_link }}" style="color: #95a5a6; text-decoration: underline;">Manage Preferences</a>
-                                          </p>
-                                      </td>
-                                  </tr>
-                              </table>
-                          </td>
-                      </tr>
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding-bottom: 20px;">
+                                        <p style="color: #7f8c8d; margin: 0 0 10px 0; font-size: 14px;">
+                                            Questions about your order? We're here to help!
+                                        </p>
+                                        <a href="mailto:support@unishopper.com"
+                                            style="color: #3498db; text-decoration: none; font-size: 14px;">Contact
+                                            Support</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding-top: 20px; border-top: 1px solid #dee2e6;">
+                                        <p style="color: #95a5a6; margin: 0; font-size: 12px;">
+                                            © 2024 UniShopper. All rights reserved.<br>
+                                            International Shopping Service - Dhaka, Bangladesh
+                                        </p>
+                                        <p style="color: #95a5a6; margin: 10px 0 0 0; font-size: 12px;">
+                                            <a href="{{ unsubscribe_link }}"
+                                                style="color: #95a5a6; text-decoration: underline;">Unsubscribe</a> |
+                                            <a href="{{ manage_preferences_link }}"
+                                                style="color: #95a5a6; text-decoration: underline;">Manage
+                                                Preferences</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
 
-                  </table>
+                </table>
 
-              </td>
-          </tr>
-      </table>
+            </td>
+        </tr>
+    </table>
 
-  </body>
-  </html>
+</body>
+
+</html>
