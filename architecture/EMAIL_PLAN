@@ -1,25 +1,53 @@
-## Phase 2 Email Infrastructure:
-- [ ] **2.1** Sign up for Resend account and get API key
-- [ ] **2.1** Add Resend environment variables to `.env.local`
-- [ ] **2.1** TEST: Resend credentials work (send test email)
+## Phase 1 Email Infrastructure (Everything below should be handled by email):
+- [x ] **1.1** Sign up for Klaviyo account and get API key
+- [x ] **1.2** Add Klaviyo environment variables to `.env.local`
+- [x] **1.3** TEST: Klaviyo credentials work (send test email)
+- [x] **2.1** After purchase we should immediately send an email confirmation to the email
+- [x] **2.15** Set up a sample email in Klaviyo 
+- [ ] **3.1** After purchase we should be notified and within 24 hours we should be sending shippipng information calculation (which we will have to put in manually) along with the same order summary and final price of each product (in case it has changed with purchase) with that shipping that will be charged from customers CC, we can give them the price and give them option to refund.
+- [ ] **3.2** If payment refund is selected we need to refund the money back to the customer
+- [ ] **4.1** If product is purchased and confirmed we charge the CC and then give them a shipping date for each product as to when it is coming to US warehouse, we would ultimately need to automate this but for now we can just expect to manually enter that
+- [ ] **5.1** After that we will ship out the product and manually provide a tracking id for the shipment on its way to BD
+- [ ] **6.1** After that once it arrives in BD we will need to send out an email saying their product has gotten to our warehouse
+- [ ] **7.1** After that once it is ready in BD we will give an option for the user to pick up the product or have it be delivered to them, we will send this via phone, but would still probably send out through email as well.
+- [ ] **8.1** Based on if they pick pick up, we will let them know where the order is ready for pickup and when
+- [ ] **8.2** Based on if they delivery, we will let them know when it is ready for delivery and give them that additional shipping cost estimate.
+- [ ] **8.3** Based on if they delivery, we will track that similar to our delivery process in US and then let htem know when it has arrived.
+- [ ] **X** Fix all CTA buttons after deployment
+
+
+
+
+ <!-- Suggestions for Improvement:
+
+  1. Email Flow Naming
+
+  - Order Confirmation (immediate)
+  - Shipping Quote & Approval (24hr)
+  - Payment Processed (after approval)
+  - US Shipping Status (when shipped to US warehouse)
+  - BD Warehouse Arrival (when in BD)
+  - Delivery Method Selection (pickup vs delivery)
+  - Final Delivery Updates (tracking)
+
+  2. Database Status Tracking
+
+  Add these statuses to your Order model:
+  - SHIPPING_QUOTE_SENT
+  - SHIPPING_APPROVED/REJECTED
+  - IN_US_WAREHOUSE
+  - SHIPPED_TO_BD
+  - IN_BD_WAREHOUSE
+  - READY_FOR_PICKUP/DELIVERY -->
+
+
+
+
+
+
+
+## Phase 2 Email OTP/Verification:
 - [ ] **2.2** Add EmailVerificationToken model to Prisma schema
 - [ ] **2.2** Update User model with emailVerificationTokens relation
-- [ ] **2.2** Run `npx prisma migrate dev --name add-email-confirmation`
-- [ ] **2.2** Run `npx prisma generate`
-- [ ] **2.2** TEST: Database migration runs without errors
-- [ ] **2.3** Install Resend package: `npm install resend`
-- [ ] **2.3** Create `src/lib/email.ts` with email service
-- [ ] **2.3** Implement `sendEmail` function with Resend
-- [ ] **2.3** Implement `generateEmailConfirmationTemplate` function
-- [ ] **2.3** TEST: Email service sends professional HTML emails
-- [ ] **2.4** Create `src/lib/email-confirmation.ts` service
-- [ ] **2.4** Implement `generateEmailConfirmationToken` function
-- [ ] **2.4** Implement `sendEmailConfirmation` function
-- [ ] **2.4** Implement `verifyEmailConfirmationToken` function
-- [ ] **2.4** TEST: Token generation, email sending, and verification works
-- [ ] **2.5** Create `src/app/api/confirm-email/route.ts`
-- [ ] **2.5** Implement GET handler for email confirmation links
-- [ ] **2.5** Add proper redirect handling with success/error states
-- [ ] **2.5** TEST: Email confirmation links work end-to-end
-- [ ] **2.6** TEST: Token expiration works (24 hours)
-- [ ] **2.6** TEST: Invalid/expired token handling works
+
+

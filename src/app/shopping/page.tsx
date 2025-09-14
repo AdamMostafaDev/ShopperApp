@@ -6,6 +6,7 @@ import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { Product } from '@/types';
 import { useCart } from '@/lib/cart-context';
 import { captureProductFromUrl } from '@/lib/product-capture';
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 
 
 
@@ -14,12 +15,19 @@ export default function ShoppingPage() {
   const [capturedProducts, setCapturedProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [showSlowMessage, setShowSlowMessage] = useState(false);
   const { addToCart } = useCart();
 
   const handleLinkCapture = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setCaptureError(null);
+    setShowSlowMessage(false);
+    
+    // Show "taking longer" message after 15 seconds
+    const slowTimer = setTimeout(() => {
+      setShowSlowMessage(true);
+    }, 15000);
     
     try {
       const result = await captureProductFromUrl(linkUrl);
@@ -28,12 +36,14 @@ export default function ShoppingPage() {
         setCapturedProducts(prev => [result.product!, ...prev]);
         setLinkUrl(''); // Clear the input after successful capture
       } else {
-        setCaptureError(result.error || 'Failed to capture product');
+        setCaptureError(result.error || ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED);
       }
     } catch (error) {
       setCaptureError('An unexpected error occurred');
     } finally {
+      clearTimeout(slowTimer);
       setIsLoading(false);
+      setShowSlowMessage(false);
     }
   };
 
@@ -218,9 +228,20 @@ export default function ShoppingPage() {
                 <p className="text-gray-600 text-sm">
                   Analyzing product page and extracting details...
                 </p>
-                <p className="text-gray-500 text-xs mt-1">
-                  This may take 10-30 seconds depending on the website
-                </p>
+                {!showSlowMessage ? (
+                  <p className="text-gray-500 text-xs mt-1">
+                    This may take 10-30 seconds depending on the website
+                  </p>
+                ) : (
+                  <div className="text-center mt-2">
+                    <p className="text-blue-600 text-sm">
+                      This is taking longer than expected...
+                    </p>
+                    <p className="text-gray-500 text-xs mt-1">
+                      Some products require extra time to process. Please wait a moment.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

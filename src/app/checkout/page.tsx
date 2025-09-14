@@ -65,9 +65,9 @@ function CheckoutForm({ clientSecret, orderData, setPaymentSuccessful, session }
     } else if (paymentIntent && paymentIntent.status === 'succeeded') {
       // Payment succeeded - capture customer information
       try {
-        // Get address and payment method details from Elements
-        const addressElement = elements.getElement('address');
-        const addressValue = await addressElement?.getValue();
+        // Get address from sessionStorage (from information step)
+        const storedAddress = sessionStorage.getItem('shippingAddress');
+        const addressData = storedAddress ? JSON.parse(storedAddress) : null;
         
         // Update order with real customer information
         const updateResponse = await fetch(`/api/orders/${orderData.orderId}/update-customer-info`, {
@@ -77,7 +77,7 @@ function CheckoutForm({ clientSecret, orderData, setPaymentSuccessful, session }
           },
           body: JSON.stringify({
             paymentIntentId: paymentIntent.id,
-            shippingAddress: addressValue?.value || null,
+            shippingAddress: addressData,
           }),
         });
         

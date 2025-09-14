@@ -1,4 +1,5 @@
 import { Product } from '@/types';
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 
 export interface ProductCaptureResult {
   success: boolean;
@@ -85,7 +86,7 @@ export async function captureProductFromUrl(url: string): Promise<ProductCapture
       const errorData = await response.json();
       return {
         success: false,
-        error: errorData.error || 'Failed to capture product. Please try again.'
+        error: errorData.error || ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED
       };
     }
 
@@ -94,7 +95,7 @@ export async function captureProductFromUrl(url: string): Promise<ProductCapture
     if (!result.success) {
       return {
         success: false,
-        error: result.error || 'Failed to capture product. Please try again.'
+        error: result.error || ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED
       };
     }
 
@@ -129,7 +130,7 @@ export async function captureProductFromUrl(url: string): Promise<ProductCapture
     console.error('Error capturing product:', error);
     return {
       success: false,
-      error: 'Failed to capture product. Please check the URL and try again.'
+      error: ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED
     };
   }
 }
@@ -157,7 +158,7 @@ export async function captureProductFromUrlReal(url: string): Promise<ProductCap
     });
 
     if (!response.ok) {
-      throw new Error('Failed to capture product');
+      throw new Error(ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED);
     }
 
     const result = await response.json();
@@ -167,7 +168,7 @@ export async function captureProductFromUrlReal(url: string): Promise<ProductCap
     console.error('Error capturing product:', error);
     return {
       success: false,
-      error: 'Failed to capture product. Please check the URL and try again.'
+      error: ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED
     };
   }
 }

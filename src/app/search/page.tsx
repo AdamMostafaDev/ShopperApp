@@ -8,6 +8,7 @@ import { Product } from '@/types';
 import { useCart } from '@/lib/cart-context';
 import { myusCategories, MyUSCategory, MyUSSubcategory, buildSearchQuery } from '@/data/myus-categories';
 import { captureProductFromUrl } from '@/lib/product-capture';
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 import Image from 'next/image';
 
 // Filter interfaces
@@ -93,7 +94,7 @@ export default function SearchPage() {
           setCapturedProducts(prev => [result.product!, ...prev]);
           setSearchResults([]); // Clear search results when capturing
         } else {
-          setCaptureError(result.error || 'Failed to capture product');
+          setCaptureError(result.error || ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED);
           setSearchResults([]);
           setCapturedProducts([]);
         }
@@ -534,10 +535,10 @@ export default function SearchPage() {
                 {searchQuery ? (
                   <>
                     <p className="text-gray-500 text-lg">
-                      {isUrl(searchQuery) ? 'Failed to capture product from this link' : `No products found for "${searchQuery}"`}
+                      {isUrl(searchQuery) ? ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED : `No products found for "${searchQuery}"`}
                     </p>
                     <p className="text-gray-400 text-sm mt-2">
-                      {isUrl(searchQuery) ? 'Please check the URL or try a different product link' : 'Try adjusting your search terms'}
+                      {isUrl(searchQuery) ? 'Please verify the link is correct or contact our support team for assistance.' : 'Try adjusting your search terms'}
                     </p>
                   </>
                 ) : (

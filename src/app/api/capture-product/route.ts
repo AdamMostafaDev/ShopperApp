@@ -35,44 +35,238 @@ function detectStore(url: string): 'amazon' | 'walmart' | 'ebay' | null {
   return null;
 }
 
+async function parseAmazonHTML(html: string, originalUrl: string): Promise<any> {
+  const cheerio = require('cheerio');
+  const $ = cheerio.load(html);
+  
+  // Check for blocked content
+  if (html.includes('robot') || html.includes('captcha') || html.includes('blocked')) {
+    throw new Error('Amazon blocked the request - will retry');
+  }
+  
+  // Extract product data from HTML
+  const result: any = {
+    name: '',
+    pricing: '',
+    price: '',
+    current_price: '',
+    list_price: '',
+    images: [],
+    average_rating: null,
+    total_reviews: null,
+    feature_bullets: [],
+    availability_status: 'In Stock'
+  };
+  
+  // Extract title
+  const titleSelectors = ['#productTitle', 'h1[data-automation-id="product-title"]', '.product-title', 'h1'];
+  for (const selector of titleSelectors) {
+    const element = $(selector).first();
+    if (element.text().trim()) {
+      result.name = element.text().trim();
+      break;
+    }
+  }
+  
+  // Extract price
+  const priceSelectors = [
+    '.a-price.a-text-price.a-size-medium.apexPriceToPay .a-offscreen',
+    '.a-price-whole',
+    '.a-price .a-offscreen',
+    '.a-price-range .a-offscreen',
+    '#priceblock_dealprice',
+    '#priceblock_ourprice'
+  ];
+  
+  for (const selector of priceSelectors) {
+    const element = $(selector).first();
+    if (element.text().trim()) {
+      result.pricing = element.text().trim();
+      result.price = element.text().trim();
+      result.current_price = element.text().trim();
+      break;
+    }
+  }
+  
+  // Extract images
+  const imageSelectors = ['#landingImage', '.a-dynamic-image', '#imgBlkFront'];
+  for (const selector of imageSelectors) {
+    const element = $(selector).first();
+    const src = element.attr('src') || element.attr('data-src');
+    if (src) {
+      result.images = [src];
+      break;
+    }
+  }
+  
+  // Extract features
+  $('#feature-bullets ul li span').each((i, el) => {
+    const text = $(el).text().trim();
+    if (text && !text.includes('Make sure') && text.length > 10) {
+      result.feature_bullets.push(text);
+    }
+  });
+  
+  // Extract rating and reviews
+  const ratingElement = $('[data-hook="average-star-rating"] .a-icon-alt, .a-icon-alt');
+  if (ratingElement.text()) {
+    const ratingText = ratingElement.text();
+    const ratingMatch = ratingText.match(/(\d+\.?\d*) out of/);
+    if (ratingMatch) {
+      result.average_rating = parseFloat(ratingMatch[1]);
+    }
+  }
+  
+  const reviewElement = $('[data-hook="total-review-count"], #acrCustomerReviewText');
+  if (reviewElement.text()) {
+    const reviewText = reviewElement.text();
+    const reviewMatch = reviewText.match(/([\d,]+)/);
+    if (reviewMatch) {
+      result.total_reviews = parseInt(reviewMatch[1].replace(/,/g, ''));
+    }
+  }
+  
+  return result;
+}
+
 async function scrapeAmazonWithScraperAPI(url: string): Promise<ScrapedProduct | null> {
-  try {
-    const apiKey = process.env.SCRAPER_API_KEY;
-    if (!apiKey) {
-      throw new Error('ScraperAPI key not configured');
-    }
+  const MAX_RETRIES = 5; // Increased from 3
+  const RETRY_DELAY = 2000; // Reduced from 3000ms
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const apiKey = process.env.SCRAPER_API_KEY;
+      if (!apiKey) {
+        throw new Error('ScraperAPI key not configured');
+      }
 
-    // Extract ASIN from Amazon URL
-    const asinMatch = url.match(/\/dp\/([A-Z0-9]{10})/);
-    if (!asinMatch) {
-      throw new Error('We were unable to process this product URL. Please verify the link is correct or contact our support team for assistance.');
-    }
-    
-    const asin = asinMatch[1];
-    console.log(`Using ScraperAPI for ASIN: ${asin}`);
+      console.log(`🔄 ScraperAPI attempt ${attempt}/${MAX_RETRIES} for URL: ${url}`);
 
-    // Use ScraperAPI's structured Amazon product endpoint with additional parameters for better data extraction
-    const scraperUrl = `https://api.scraperapi.com/structured/amazon/product?api_key=${apiKey}&asin=${asin}&render=true&wait_for=3&timeout=60000`;
+      // Try multiple extraction methods for ASIN/product ID
+      let asin = '';
+      let useStructuredAPI = true;
+      
+      // Method 1: Standard ASIN pattern
+      const asinMatch = url.match(/\/dp\/([A-Z0-9]{10})/);
+      if (asinMatch) {
+        asin = asinMatch[1];
+      } else {
+        // Method 2: Alternative Amazon patterns
+        const altPatterns = [
+          /\/gp\/product\/([A-Z0-9]{10})/,
+          /\/exec\/obidos\/ASIN\/([A-Z0-9]{10})/,
+          /[?&]asin=([A-Z0-9]{10})/i,
+          /\/([A-Z0-9]{10})(?:\/|$|\?)/
+        ];
+        
+        for (const pattern of altPatterns) {
+          const match = url.match(pattern);
+          if (match) {
+            asin = match[1];
+            break;
+          }
+        }
+        
+        // If no ASIN found, fall back to raw URL scraping
+        if (!asin) {
+          console.log('⚠️ No ASIN found, using raw URL scraping');
+          useStructuredAPI = false;
+        }
+      }
+
+      let scraperUrl: string;
+      
+      if (useStructuredAPI && asin) {
+        // Use structured API with enhanced parameters and US domain
+        scraperUrl = `https://api.scraperapi.com/structured/amazon/product?api_key=${apiKey}&asin=${asin}&domain=amazon.com&render=true&wait_for=5&timeout=120000&premium=true&device_type=desktop&session_number=${attempt}`;
+      } else {
+        // Use raw scraping API as fallback with enhanced parameters
+        const encodedUrl = encodeURIComponent(url);
+        scraperUrl = `https://api.scraperapi.com/?api_key=${apiKey}&url=${encodedUrl}&render=true&wait_for=5&timeout=120000&premium=true&device_type=desktop&session_number=${attempt}&retry_404=true`;
+      }
+      
+      const response = await fetch(scraperUrl, {
+        timeout: 150000 // Increased timeout to 150 seconds
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`ScraperAPI HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+
+      let data;
+      if (useStructuredAPI && asin) {
+        data = await response.json();
+      } else {
+        // Parse raw HTML response
+        const html = await response.text();
+        data = await parseAmazonHTML(html, url);
+      }
     
-    const response = await fetch(scraperUrl, {
-      timeout: 90000 // 90 second timeout for the request
+    console.log('📊 ScraperAPI Raw Response:', {
+      name: data.name,
+      pricing: data.pricing,
+      list_price: data.list_price,
+      price: data.price,
+      current_price: data.current_price,
+      availability_status: data.availability_status,
+      images_count: data.images?.length || 0,
+      all_price_fields: Object.keys(data).filter(key => key.toLowerCase().includes('price'))
     });
-    
-    if (!response.ok) {
-      throw new Error('We were unable to process this product URL. Please verify the link is correct or contact our support team for assistance.');
-    }
-
-    const data = await response.json();
-    
     
     if (!data || !data.name) {
       throw new Error('We were unable to process this product URL. Please verify the link is correct or contact our support team for assistance.');
     }
 
-    // Parse original prices and detect currency
-    const originalPriceValue = data.pricing ? parsePriceFromScrapedText(data.pricing) : 0;
-    const originalListPrice = data.list_price ? parsePriceFromScrapedText(data.list_price) : undefined;
-    const currency = detectCurrency(data.pricing || '');
+      // Try multiple price fields to get the best price data
+      let originalPriceValue = 0;
+      let originalListPrice = undefined;
+      let currency = 'USD';
+
+      // Priority order for price extraction
+      const priceFields = [data.pricing, data.price, data.current_price, data.list_price, data.sale_price];
+      
+      for (const priceField of priceFields) {
+        if (priceField) {
+          const parsedPrice = parsePriceFromScrapedText(priceField);
+          if (parsedPrice > 0) {
+            originalPriceValue = parsedPrice;
+            currency = detectCurrency(priceField);
+            break;
+          }
+        }
+      }
+      
+      // Set list price if available and different from main price
+      if (data.list_price) {
+        const listParsed = parsePriceFromScrapedText(data.list_price);
+        if (listParsed > 0 && listParsed !== originalPriceValue) {
+          originalListPrice = listParsed;
+        }
+      }
+      
+      console.log('💰 Price Parsing Results:', {
+        raw_pricing: data.pricing,
+        parsed_price: originalPriceValue,
+        raw_list_price: data.list_price,
+        parsed_list_price: originalListPrice,
+        detected_currency: currency
+      });
+
+      // CRITICAL: If price is 0 or undefined, retry (except on last attempt)
+      if (originalPriceValue <= 0 && attempt < MAX_RETRIES) {
+        console.log(`🚨 Attempt ${attempt}: Price is $${originalPriceValue} - RETRYING in ${RETRY_DELAY/1000}s...`);
+        // Use longer delay for pricing issues (might be temporary)
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * 1.5));
+        continue; // Try again
+      }
+      
+      // If still no price on final attempt, throw error
+      if (originalPriceValue <= 0) {
+        throw new Error(`❌ FINAL ATTEMPT: Could not extract valid price after ${MAX_RETRIES} attempts. Product pricing may be unavailable.`);
+      }
+
+      console.log(`✅ Valid price found on attempt ${attempt}: $${originalPriceValue} ${currency}`);
     
     // Only convert if not already in BDT (save API costs!)
     let bdtPrice: number;
@@ -145,13 +339,49 @@ async function scrapeAmazonWithScraperAPI(url: string): Promise<ScrapedProduct |
       store: 'amazon'
     };
 
-    console.log('ScraperAPI success:', product.title);
-    return product;
+      console.log('ScraperAPI success:', product.title);
+      return product;
 
-  } catch (error) {
-    console.error('ScraperAPI error:', error);
-    return null;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`❌ ScraperAPI attempt ${attempt} failed:`, errorMessage);
+      
+      // Check if this is a retriable error
+      const isRetriableError = 
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('HTTP 5') ||
+        errorMessage.includes('blocked') ||
+        errorMessage.includes('network') ||
+        errorMessage.includes('ECONNRESET') ||
+        errorMessage.includes('ETIMEDOUT');
+      
+      if (attempt === MAX_RETRIES) {
+        console.error('🚫 All ScraperAPI attempts failed');
+        return null;
+      }
+      
+      // Use different retry delays based on error type
+      let retryDelay = RETRY_DELAY;
+      if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+        retryDelay = RETRY_DELAY * 3; // Longer delay for rate limits
+      } else if (errorMessage.includes('blocked') || errorMessage.includes('captcha')) {
+        retryDelay = RETRY_DELAY * 2; // Medium delay for blocks
+      }
+      
+      // Skip retry for non-retriable errors on later attempts
+      if (!isRetriableError && attempt >= 3) {
+        console.log(`🚫 Non-retriable error on attempt ${attempt}, skipping remaining retries`);
+        return null;
+      }
+      
+      // Wait before next retry
+      console.log(`⏳ Waiting ${retryDelay/1000}s before next attempt... (Error type: ${isRetriableError ? 'retriable' : 'non-retriable'})`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
   }
+  
+  // This should never be reached, but just in case
+  return null;
 }
 
 async function scrapeAmazonFallback(url: string): Promise<ScrapedProduct | null> {
@@ -908,22 +1138,9 @@ export async function POST(request: NextRequest) {
     // Scrape based on store
     switch (store) {
       case 'amazon':
-        // Try ScraperAPI first (most reliable)
-        console.log('Trying ScraperAPI first...');
+        // Use ScraperAPI only
+        console.log('Using ScraperAPI...');
         product = await scrapeAmazonWithScraperAPI(url);
-        
-        // // If ScraperAPI fails, try Puppeteer
-        // if (!product) {
-        //   console.log('ScraperAPI failed, trying Puppeteer...');
-        //   product = await scrapeAmazon(page, url);
-        // }
-        
-        // // If both fail, try fallback HTTP method
-        // if (!product) {
-        //   console.log('Puppeteer failed, trying fallback method...');
-        //   product = await scrapeAmazonFallback(url);
-        // }
-        
         await browser.close();
         break;
       case 'walmart':

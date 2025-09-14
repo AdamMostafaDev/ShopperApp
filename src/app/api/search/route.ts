@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { detectStore } from '@/lib/product-capture';
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -66,7 +67,7 @@ async function captureProductFromUrl(url: string): Promise<SearchProduct | null>
 
 		if (!response.ok) {
 			const errorData = await response.json();
-			throw new Error(errorData.error || 'Failed to capture product');
+			throw new Error(errorData.error || ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED);
 		}
 
 		const result = await response.json();
@@ -124,7 +125,7 @@ export const GET = async (request: Request) => {
 			} else {
 				return NextResponse.json({ 
 					success: false, 
-					error: 'Failed to capture product from URL. Please check the URL and try again.' 
+					error: ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED 
 				}, { status: 500 });
 			}
 		}

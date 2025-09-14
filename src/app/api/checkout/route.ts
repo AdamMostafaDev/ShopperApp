@@ -4,6 +4,7 @@ import { authConfig } from '@/lib/auth';
 import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
 import { calculateCartTotals } from '@/lib/shipping';
+import { sendOrderConfirmationEmail } from '@/lib/klaviyo';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2024-06-20',
@@ -30,6 +31,22 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // CRITICAL: Block checkout if any product has $0 price
+    for (const item of cartItems) {
+      if (!item.product.price || item.product.price <= 0) {
+        console.error('🚨 BLOCKED: Attempting to checkout $0 product:', item.product.title);
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `Product "${item.product.title}" has invalid pricing. Please remove it from your cart and try again.`
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    console.log('✅ All products have valid pricing, proceeding with checkout');
 
     // Calculate totals using existing shipping logic
     const totals = calculateCartTotals(
@@ -146,6 +163,60 @@ export async function POST(request: NextRequest) {
     });
 
     console.log('✅ Checkout session created:', checkoutSession.id);
+
+    // Send order confirmation email
+    try {
+      const finalCustomerEmail = customerInfo.email || session.user.email!;
+      
+      console.log('🔍 EMAIL DEBUG INFO:');
+      console.log('- customerInfo.email:', customerInfo.email);
+      console.log('- session.user.email:', session.user.email);
+      console.log('- Final email to use:', finalCustomerEmail);
+      console.log('- Order ID:', order.id);
+      console.log('- Order Number:', order.orderNumber);
+      
+      const orderData = {
+        orderId: order.id.toString(),
+        orderNumber: order.orderNumber,
+        customerEmail: finalCustomerEmail,
+        customerName: customerInfo.name || session.user.name || 'Customer',
+        items: cartItems.map((item: any) => ({
+          id: item.product.id,
+          title: item.product.title,
+          price: item.product.price,
+          originalPriceValue: item.product.originalPrice || (item.product.price / 121.17), // fallback exchange rate
+          quantity: item.quantity,
+          image: item.product.image || 'https://via.placeholder.com/100x100',
+          url: item.product.url || '#',
+          store: item.product.store || 'unknown'
+        })),
+        subtotalBdt: Number(totals.subtotal),
+        serviceChargeBdt: Number(totals.serviceCharge),
+        taxBdt: Number(totals.tax || 0),
+        totalAmountBdt: Number(totals.total),
+        subtotalUsd: Number(totals.subtotal) / 121.17, // Convert to USD
+        serviceChargeUsd: Number(totals.serviceCharge) / 121.17,
+        taxUsd: Number(totals.tax || 0) / 121.17,
+        totalAmountUsd: Number(totals.total) / 121.17,
+        exchangeRate: 121.17, // You might want to make this dynamic
+        currency: 'BDT',
+        orderDate: order.createdAt.toISOString()
+      };
+
+      console.log('📧 Sending order confirmation email to:', orderData.customerEmail);
+      
+      const emailResult = await sendOrderConfirmationEmail(orderData);
+      
+      if (emailResult.success) {
+        console.log('✅ Order confirmation email sent successfully to:', orderData.customerEmail);
+      } else {
+        console.error('❌ Failed to send order confirmation email:', emailResult.error);
+        // Don't fail the checkout if email fails
+      }
+    } catch (emailError) {
+      console.error('❌ Error sending order confirmation email:', emailError);
+      // Don't fail the checkout if email fails
+    }
 
     return NextResponse.json({
       success: true,

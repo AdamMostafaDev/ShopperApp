@@ -8,6 +8,7 @@ import { StarIcon } from '@heroicons/react/24/outline';
 import { Product } from '@/types';
 import { useCart } from '@/lib/cart-context';
 import { captureProductFromUrl, isAmazonLink } from '@/lib/product-capture';
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 import { formatBdtPrice, formatPriceWithOriginal } from '@/lib/currency';
 import Image from 'next/image';
 
@@ -57,7 +58,7 @@ export default function Home() {
           setCapturedProducts(prev => [result.product!, ...prev]);
           setSearchResults([]);
         } else {
-          setSearchError(result.error || 'Failed to capture product');
+          setSearchError(result.error || ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED);
           setSearchResults([]);
           setCapturedProducts([]);
         }
@@ -246,12 +247,12 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Error Messages */}
             {searchError && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center">
-                  <svg className="h-5 w-5 text-red-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg className="h-5 w-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  <p className="text-red-700 text-sm">{searchError}</p>
+                  <p className="text-blue-700 text-sm">{searchError}</p>
                 </div>
               </div>
             )}
