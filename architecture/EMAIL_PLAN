@@ -1,0 +1,55 @@
+## Phase 1 Email Infrastructure (Everything below should be handled by email):
+- [x ] **1.1** Sign up for Klaviyo account and get API key
+- [x ] **1.2** Add Klaviyo environment variables to `.env.local`
+- [x] **1.3** TEST: Klaviyo credentials work (send test email)
+- [x] **2.1** After purchase we should immediately send an email confirmation to the email
+- [x] **2.15** Set up a sample email in Klaviyo 
+- [x] **3.1** After purchase we should be notified and within 24 hours we should be sending shippipng information calculation (which we will have to put in manually) along with the same order summary and final price of each product (in case it has changed with purchase) with that shipping that will be charged from customers CC, we can give them the price and give them option to refund.
+- [ ] **3.2** If payment refund is selected we need to refund the money back to the customer
+- [ ] **4.1** If product is purchased and confirmed we charge the CC and then give them a shipping date for each product as to when it is coming to US warehouse, we would ultimately need to automate this but for now we can just expect to manually enter that
+- [ ] **5.1** After that we will ship out the product and manually provide a tracking id for the shipment on its way to BD
+- [ ] **6.1** After that once it arrives in BD we will need to send out an email saying their product has gotten to our warehouse
+- [ ] **7.1** After that once it is ready in BD we will give an option for the user to pick up the product or have it be delivered to them, we will send this via phone, but would still probably send out through email as well.
+- [ ] **8.1** Based on if they pick pick up, we will let them know where the order is ready for pickup and when
+- [ ] **8.2** Based on if they delivery, we will let them know when it is ready for delivery and give them that additional shipping cost estimate.
+- [ ] **8.3** Based on if they delivery, we will track that similar to our delivery process in US and then let htem know when it has arrived.
+- [ ] **X.1** Fix contact us buttons
+- [ ] **X.2** Fix refund and accept to update (create confirm/refund endpoints)
+
+- [ ] **Z.2** Fix refund and accept to update (create confirm/refund endpoints)
+
+
+
+ <!-- Suggestions for Improvement:
+
+  1. Email Flow Naming
+
+  - Order Confirmation (immediate)
+  - Shipping Quote & Approval (24hr)
+  - Payment Processed (after approval)
+  - US Shipping Status (when shipped to US warehouse)
+  - BD Warehouse Arrival (when in BD)
+  - Delivery Method Selection (pickup vs delivery)
+  - Final Delivery Updates (tracking)
+
+  2. Database Status Tracking
+
+  Add these statuses to your Order model:
+  - SHIPPING_QUOTE_SENT
+  - SHIPPING_APPROVED/REJECTED
+  - IN_US_WAREHOUSE
+  - SHIPPED_TO_BD
+  - IN_BD_WAREHOUSE
+  - READY_FOR_PICKUP/DELIVERY -->
+
+
+
+
+
+
+
+## Phase 2 Email OTP/Verification:
+- [ ] **2.2** Add EmailVerificationToken model to Prisma schema
+- [ ] **2.2** Update User model with emailVerificationTokens relation
+
+

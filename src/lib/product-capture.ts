@@ -1,4 +1,5 @@
 import { Product } from '@/types';
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 
 export interface ProductCaptureResult {
   success: boolean;
@@ -85,7 +86,7 @@ export async function captureProductFromUrl(url: string): Promise<ProductCapture
       const errorData = await response.json();
       return {
         success: false,
-        error: errorData.error || 'Failed to capture product. Please try again.'
+        error: errorData.error || ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED
       };
     }
 
@@ -94,17 +95,21 @@ export async function captureProductFromUrl(url: string): Promise<ProductCapture
     if (!result.success) {
       return {
         success: false,
-        error: result.error || 'Failed to capture product. Please try again.'
+        error: result.error || ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED
       };
     }
 
     // Transform the scraped product to match our Product interface
     const scrapedProduct = result.product;
+    console.log('🔄 Transforming scraped product, weight:', scrapedProduct.weight, 'kg');
     const product: Product = {
       id: scrapedProduct.id,
       title: scrapedProduct.title,
       price: scrapedProduct.price,
       originalPrice: scrapedProduct.originalPrice,
+      originalCurrency: scrapedProduct.originalCurrency,
+      originalPriceValue: scrapedProduct.originalPriceValue,
+      weight: scrapedProduct.weight, // Include weight field!
       image: scrapedProduct.image || '/api/placeholder/300/300',
       rating: scrapedProduct.rating || 0,
       reviewCount: scrapedProduct.reviewCount || 0,
@@ -114,6 +119,7 @@ export async function captureProductFromUrl(url: string): Promise<ProductCapture
       features: scrapedProduct.features,
       availability: scrapedProduct.availability
     };
+    console.log('✅ Transformed product, weight:', product.weight, 'kg');
 
     return {
       success: true,
@@ -124,7 +130,7 @@ export async function captureProductFromUrl(url: string): Promise<ProductCapture
     console.error('Error capturing product:', error);
     return {
       success: false,
-      error: 'Failed to capture product. Please check the URL and try again.'
+      error: ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED
     };
   }
 }
@@ -152,7 +158,7 @@ export async function captureProductFromUrlReal(url: string): Promise<ProductCap
     });
 
     if (!response.ok) {
-      throw new Error('Failed to capture product');
+      throw new Error(ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED);
     }
 
     const result = await response.json();
@@ -162,7 +168,7 @@ export async function captureProductFromUrlReal(url: string): Promise<ProductCap
     console.error('Error capturing product:', error);
     return {
       success: false,
-      error: 'Failed to capture product. Please check the URL and try again.'
+      error: ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED
     };
   }
 }

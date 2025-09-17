@@ -1,8 +1,11 @@
 export interface Product {
   id: string;
   title: string;
-  price: number;
-  originalPrice?: number;
+  price: number; // BDT converted price
+  originalPrice?: number; // BDT converted original price  
+  originalCurrency?: string; // USD, CAD, GBP, AUD
+  originalPriceValue?: number; // Original price before conversion
+  weight?: number; // Weight in kg for shipping calculation
   image: string;
   rating: number;
   reviewCount: number;

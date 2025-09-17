@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ShoppingCartIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useCart } from '@/lib/cart-context';
+import UserDropdown from './UserDropdown';
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -51,12 +52,7 @@ export default function Header() {
             </Link>
             
             <div className="hidden md:flex items-center space-x-3">
-              <Link 
-                href="/signin" 
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
-              >
-                Sign In
-              </Link>
+              <UserDropdown />
             </div>
 
             {/* Mobile menu button */}
@@ -90,12 +86,7 @@ export default function Header() {
                 Contact
               </Link>
               <div className="pt-4 border-t border-gray-200">
-                <Link 
-                  href="/signin" 
-                  className="block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium text-center"
-                >
-                  Sign In
-                </Link>
+                <UserDropdown />
               </div>
             </nav>
           </div>

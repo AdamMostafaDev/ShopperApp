@@ -3,11 +3,15 @@ import puppeteer from 'puppeteer';
 import UserAgent from 'user-agents';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { parsePriceFromScrapedText, convertToBdt, detectCurrency, isBdtPrice } from '@/lib/currency';
 
 interface ScrapedProduct {
   title: string;
-  price: number;
-  originalPrice?: number;
+  price: number; // BDT converted price
+  originalPrice?: number; // BDT converted original price
+  originalCurrency?: string; // USD, CAD, GBP, AUD
+  originalPriceValue?: number; // Original price before conversion
+  weight?: number; // Weight in kg for shipping calculation
   image: string;
   rating?: number;
   reviewCount?: number;
@@ -28,6 +32,355 @@ function detectStore(url: string): 'amazon' | 'walmart' | 'ebay' | null {
     return 'ebay';
   }
   
+  return null;
+}
+
+async function parseAmazonHTML(html: string, originalUrl: string): Promise<any> {
+  const cheerio = require('cheerio');
+  const $ = cheerio.load(html);
+  
+  // Check for blocked content
+  if (html.includes('robot') || html.includes('captcha') || html.includes('blocked')) {
+    throw new Error('Amazon blocked the request - will retry');
+  }
+  
+  // Extract product data from HTML
+  const result: any = {
+    name: '',
+    pricing: '',
+    price: '',
+    current_price: '',
+    list_price: '',
+    images: [],
+    average_rating: null,
+    total_reviews: null,
+    feature_bullets: [],
+    availability_status: 'In Stock'
+  };
+  
+  // Extract title
+  const titleSelectors = ['#productTitle', 'h1[data-automation-id="product-title"]', '.product-title', 'h1'];
+  for (const selector of titleSelectors) {
+    const element = $(selector).first();
+    if (element.text().trim()) {
+      result.name = element.text().trim();
+      break;
+    }
+  }
+  
+  // Extract price
+  const priceSelectors = [
+    '.a-price.a-text-price.a-size-medium.apexPriceToPay .a-offscreen',
+    '.a-price-whole',
+    '.a-price .a-offscreen',
+    '.a-price-range .a-offscreen',
+    '#priceblock_dealprice',
+    '#priceblock_ourprice'
+  ];
+  
+  for (const selector of priceSelectors) {
+    const element = $(selector).first();
+    if (element.text().trim()) {
+      result.pricing = element.text().trim();
+      result.price = element.text().trim();
+      result.current_price = element.text().trim();
+      break;
+    }
+  }
+  
+  // Extract images
+  const imageSelectors = ['#landingImage', '.a-dynamic-image', '#imgBlkFront'];
+  for (const selector of imageSelectors) {
+    const element = $(selector).first();
+    const src = element.attr('src') || element.attr('data-src');
+    if (src) {
+      result.images = [src];
+      break;
+    }
+  }
+  
+  // Extract features
+  $('#feature-bullets ul li span').each((i, el) => {
+    const text = $(el).text().trim();
+    if (text && !text.includes('Make sure') && text.length > 10) {
+      result.feature_bullets.push(text);
+    }
+  });
+  
+  // Extract rating and reviews
+  const ratingElement = $('[data-hook="average-star-rating"] .a-icon-alt, .a-icon-alt');
+  if (ratingElement.text()) {
+    const ratingText = ratingElement.text();
+    const ratingMatch = ratingText.match(/(\d+\.?\d*) out of/);
+    if (ratingMatch) {
+      result.average_rating = parseFloat(ratingMatch[1]);
+    }
+  }
+  
+  const reviewElement = $('[data-hook="total-review-count"], #acrCustomerReviewText');
+  if (reviewElement.text()) {
+    const reviewText = reviewElement.text();
+    const reviewMatch = reviewText.match(/([\d,]+)/);
+    if (reviewMatch) {
+      result.total_reviews = parseInt(reviewMatch[1].replace(/,/g, ''));
+    }
+  }
+  
+  return result;
+}
+
+async function scrapeAmazonWithScraperAPI(url: string): Promise<ScrapedProduct | null> {
+  const MAX_RETRIES = 5; // Increased from 3
+  const RETRY_DELAY = 2000; // Reduced from 3000ms
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const apiKey = process.env.SCRAPER_API_KEY;
+      if (!apiKey) {
+        throw new Error('ScraperAPI key not configured');
+      }
+
+      console.log(`🔄 ScraperAPI attempt ${attempt}/${MAX_RETRIES} for URL: ${url}`);
+
+      // Try multiple extraction methods for ASIN/product ID
+      let asin = '';
+      let useStructuredAPI = true;
+      
+      // Method 1: Standard ASIN pattern
+      const asinMatch = url.match(/\/dp\/([A-Z0-9]{10})/);
+      if (asinMatch) {
+        asin = asinMatch[1];
+      } else {
+        // Method 2: Alternative Amazon patterns
+        const altPatterns = [
+          /\/gp\/product\/([A-Z0-9]{10})/,
+          /\/exec\/obidos\/ASIN\/([A-Z0-9]{10})/,
+          /[?&]asin=([A-Z0-9]{10})/i,
+          /\/([A-Z0-9]{10})(?:\/|$|\?)/
+        ];
+        
+        for (const pattern of altPatterns) {
+          const match = url.match(pattern);
+          if (match) {
+            asin = match[1];
+            break;
+          }
+        }
+        
+        // If no ASIN found, fall back to raw URL scraping
+        if (!asin) {
+          console.log('⚠️ No ASIN found, using raw URL scraping');
+          useStructuredAPI = false;
+        }
+      }
+
+      let scraperUrl: string;
+      
+      if (useStructuredAPI && asin) {
+        // Use structured API with enhanced parameters and US domain
+        scraperUrl = `https://api.scraperapi.com/structured/amazon/product?api_key=${apiKey}&asin=${asin}&domain=amazon.com&render=true&wait_for=5&timeout=120000&premium=true&device_type=desktop&session_number=${attempt}`;
+      } else {
+        // Use raw scraping API as fallback with enhanced parameters
+        const encodedUrl = encodeURIComponent(url);
+        scraperUrl = `https://api.scraperapi.com/?api_key=${apiKey}&url=${encodedUrl}&render=true&wait_for=5&timeout=120000&premium=true&device_type=desktop&session_number=${attempt}&retry_404=true`;
+      }
+      
+      const response = await fetch(scraperUrl, {
+        timeout: 150000 // Increased timeout to 150 seconds
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`ScraperAPI HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+
+      let data;
+      if (useStructuredAPI && asin) {
+        data = await response.json();
+      } else {
+        // Parse raw HTML response
+        const html = await response.text();
+        data = await parseAmazonHTML(html, url);
+      }
+    
+    console.log('📊 ScraperAPI Raw Response:', {
+      name: data.name,
+      pricing: data.pricing,
+      list_price: data.list_price,
+      price: data.price,
+      current_price: data.current_price,
+      availability_status: data.availability_status,
+      images_count: data.images?.length || 0,
+      all_price_fields: Object.keys(data).filter(key => key.toLowerCase().includes('price'))
+    });
+    
+    if (!data || !data.name) {
+      throw new Error('We were unable to process this product URL. Please verify the link is correct or contact our support team for assistance.');
+    }
+
+      // Try multiple price fields to get the best price data
+      let originalPriceValue = 0;
+      let originalListPrice = undefined;
+      let currency = 'USD';
+
+      // Priority order for price extraction
+      const priceFields = [data.pricing, data.price, data.current_price, data.list_price, data.sale_price];
+      
+      for (const priceField of priceFields) {
+        if (priceField) {
+          const parsedPrice = parsePriceFromScrapedText(priceField);
+          if (parsedPrice > 0) {
+            originalPriceValue = parsedPrice;
+            currency = detectCurrency(priceField);
+            break;
+          }
+        }
+      }
+      
+      // Set list price if available and different from main price
+      if (data.list_price) {
+        const listParsed = parsePriceFromScrapedText(data.list_price);
+        if (listParsed > 0 && listParsed !== originalPriceValue) {
+          originalListPrice = listParsed;
+        }
+      }
+      
+      console.log('💰 Price Parsing Results:', {
+        raw_pricing: data.pricing,
+        parsed_price: originalPriceValue,
+        raw_list_price: data.list_price,
+        parsed_list_price: originalListPrice,
+        detected_currency: currency
+      });
+
+      // CRITICAL: If price is 0 or undefined, retry (except on last attempt)
+      if (originalPriceValue <= 0 && attempt < MAX_RETRIES) {
+        console.log(`🚨 Attempt ${attempt}: Price is $${originalPriceValue} - RETRYING in ${RETRY_DELAY/1000}s...`);
+        // Use longer delay for pricing issues (might be temporary)
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * 1.5));
+        continue; // Try again
+      }
+      
+      // If still no price on final attempt, throw error
+      if (originalPriceValue <= 0) {
+        throw new Error(`❌ FINAL ATTEMPT: Could not extract valid price after ${MAX_RETRIES} attempts. Product pricing may be unavailable.`);
+      }
+
+      console.log(`✅ Valid price found on attempt ${attempt}: $${originalPriceValue} ${currency}`);
+    
+    // Only convert if not already in BDT (save API costs!)
+    let bdtPrice: number;
+    let bdtOriginalPrice: number | undefined;
+    
+    if (currency === 'BDT') {
+      console.log('💰 Price already in BDT, skipping conversion');
+      bdtPrice = originalPriceValue;
+      bdtOriginalPrice = originalListPrice;
+    } else {
+      console.log(`💱 Converting ${currency} to BDT`);
+      bdtPrice = await convertToBdt(originalPriceValue, currency);
+      bdtOriginalPrice = originalListPrice ? await convertToBdt(originalListPrice, currency) : undefined;
+    }
+    
+    // Extract weight from multiple possible fields
+    let weight: number | undefined;
+    const weightSources = [
+      data.product_information?.item_weight,
+      data.product_information?.shipping_weight,
+      data.product_information?.package_weight,
+      data.item_weight,
+      data.shipping_weight,
+      data.weight
+    ];
+    
+    for (const weightSource of weightSources) {
+      if (weightSource && typeof weightSource === 'string') {
+        const weightMatch = weightSource.match(/(\d+(?:\.\d+)?)\s*(kg|kilogram|pound|lb|g|gram|oz|ounce)/i);
+        if (weightMatch) {
+          let extractedWeight = parseFloat(weightMatch[1]);
+          const unit = weightMatch[2].toLowerCase();
+          
+          // Convert to kg
+          if (unit.includes('pound') || unit.includes('lb')) {
+            extractedWeight = extractedWeight * 0.453592; // pounds to kg
+          } else if ((unit.includes('g') && !unit.includes('kg')) || unit.includes('gram')) {
+            extractedWeight = extractedWeight / 1000; // grams to kg
+          } else if (unit.includes('oz') || unit.includes('ounce')) {
+            extractedWeight = extractedWeight * 0.0283495; // ounces to kg
+          }
+          // kg and kilogram stay as is
+          
+          weight = extractedWeight;
+          console.log(`📦 Product weight: ${weight}kg (converted from ${weightMatch[0]})`);
+          break; // Found weight, stop checking other sources
+        }
+      }
+    }
+    
+    if (!weight) {
+      console.log('⚠️ No weight found in product data - will use 1kg default for shipping');
+    }
+    
+    // Convert ScraperAPI response to our format
+    const product: ScrapedProduct = {
+      title: data.name,
+      price: bdtPrice,
+      originalPrice: bdtOriginalPrice,
+      originalCurrency: currency,
+      originalPriceValue: originalPriceValue,
+      weight: weight,
+      image: data.images && data.images.length > 0 ? data.images[0] : '',
+      rating: data.average_rating ? parseFloat(data.average_rating.toString()) : undefined,
+      reviewCount: data.total_reviews ? parseInt(data.total_reviews.toString()) : undefined,
+      description: data.feature_bullets && data.feature_bullets.length > 0 ? data.feature_bullets.slice(0, 3).join('. ') : '',
+      features: data.feature_bullets || [],
+      availability: data.availability_status === 'In Stock' ? 'in_stock' : 
+                   data.availability_status === 'Out of Stock' ? 'out_of_stock' : 'limited',
+      store: 'amazon'
+    };
+
+      console.log('ScraperAPI success:', product.title);
+      return product;
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`❌ ScraperAPI attempt ${attempt} failed:`, errorMessage);
+      
+      // Check if this is a retriable error
+      const isRetriableError = 
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('HTTP 5') ||
+        errorMessage.includes('blocked') ||
+        errorMessage.includes('network') ||
+        errorMessage.includes('ECONNRESET') ||
+        errorMessage.includes('ETIMEDOUT');
+      
+      if (attempt === MAX_RETRIES) {
+        console.error('🚫 All ScraperAPI attempts failed');
+        return null;
+      }
+      
+      // Use different retry delays based on error type
+      let retryDelay = RETRY_DELAY;
+      if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+        retryDelay = RETRY_DELAY * 3; // Longer delay for rate limits
+      } else if (errorMessage.includes('blocked') || errorMessage.includes('captcha')) {
+        retryDelay = RETRY_DELAY * 2; // Medium delay for blocks
+      }
+      
+      // Skip retry for non-retriable errors on later attempts
+      if (!isRetriableError && attempt >= 3) {
+        console.log(`🚫 Non-retriable error on attempt ${attempt}, skipping remaining retries`);
+        return null;
+      }
+      
+      // Wait before next retry
+      console.log(`⏳ Waiting ${retryDelay/1000}s before next attempt... (Error type: ${isRetriableError ? 'retriable' : 'non-retriable'})`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
+  }
+  
+  // This should never be reached, but just in case
   return null;
 }
 
@@ -57,6 +410,12 @@ async function scrapeAmazonFallback(url: string): Promise<ScrapedProduct | null>
 
     const $ = cheerio.load(response.data);
 
+    // Check if we got a CAPTCHA or blocked page
+    if (response.data.includes('robot') || response.data.includes('captcha') || response.data.includes('blocked') || 
+        response.data.includes('Continue shopping') || $('title').text().trim() === 'Amazon.com') {
+      throw new Error('Amazon has blocked this request. Please try again later or use a different network connection.');
+    }
+
     // Extract title
     let title = '';
     const titleSelectors = ['#productTitle', 'h1[data-automation-id="product-title"]', '.product-title', 'h1'];
@@ -69,6 +428,7 @@ async function scrapeAmazonFallback(url: string): Promise<ScrapedProduct | null>
     }
 
     if (!title) {
+      console.log('Failed to find title with any selector');
       throw new Error('Could not extract product title');
     }
 
@@ -160,10 +520,51 @@ async function scrapeAmazonFallback(url: string): Promise<ScrapedProduct | null>
 
     const description = features.slice(0, 3).join('. ');
 
+    // Extract weight from product details or shipping information
+    let weight: number | undefined;
+    const weightSelectors = [
+      '#productDetails_detailBullets_sections1 tr td span',
+      '#productDetails_techSpec_section_1 tr td',
+      '.a-list-item .a-text-bold'
+    ];
+
+    for (const selector of weightSelectors) {
+      $(selector).each((i, el) => {
+        const text = $(el).text().trim();
+        if (text.toLowerCase().includes('weight') || text.toLowerCase().includes('shipping weight')) {
+          const parent = $(el).parent();
+          const fullText = parent.text();
+          const weightMatch = fullText.match(/(\d+(?:\.\d+)?)\s*(kg|pound|lb|g|gram)/i);
+          if (weightMatch) {
+            let extractedWeight = parseFloat(weightMatch[1]);
+            const unit = weightMatch[2].toLowerCase();
+            
+            // Convert to kg
+            if (unit.includes('pound') || unit.includes('lb')) {
+              extractedWeight = extractedWeight * 0.453592; // pounds to kg
+            } else if (unit.includes('g') && !unit.includes('kg')) {
+              extractedWeight = extractedWeight / 1000; // grams to kg
+            }
+            
+            weight = extractedWeight;
+            return false; // Break the loop
+          }
+        }
+      });
+      if (weight) break;
+    }
+
+    if (!weight) {
+      console.log('⚠️ No weight found in fallback scraping');
+    } else {
+      console.log(`📦 Product weight from fallback: ${weight}kg`);
+    }
+
     return {
       title,
       price,
       originalPrice,
+      weight,
       image,
       rating,
       reviewCount,
@@ -372,6 +773,40 @@ async function scrapeAmazon(page: any, url: string): Promise<ScrapedProduct | nu
 
       description = features.slice(0, 3).join('. ');
 
+      // Extract weight from product details
+      let weight: number | undefined;
+      const weightSelectors = [
+        '#productDetails_detailBullets_sections1 tr td span',
+        '#productDetails_techSpec_section_1 tr td',
+        '.a-list-item .a-text-bold'
+      ];
+
+      for (const selector of weightSelectors) {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach((el) => {
+          const text = el.textContent?.trim() || '';
+          if (text.toLowerCase().includes('weight') || text.toLowerCase().includes('shipping weight')) {
+            const parent = el.parentElement;
+            const fullText = parent?.textContent || '';
+            const weightMatch = fullText.match(/(\d+(?:\.\d+)?)\s*(kg|pound|lb|g|gram)/i);
+            if (weightMatch) {
+              let extractedWeight = parseFloat(weightMatch[1]);
+              const unit = weightMatch[2].toLowerCase();
+              
+              // Convert to kg
+              if (unit.includes('pound') || unit.includes('lb')) {
+                extractedWeight = extractedWeight * 0.453592; // pounds to kg
+              } else if (unit.includes('g') && !unit.includes('kg')) {
+                extractedWeight = extractedWeight / 1000; // grams to kg
+              }
+              
+              weight = extractedWeight;
+            }
+          }
+        });
+        if (weight) break;
+      }
+
       // Availability
       let availability: 'in_stock' | 'out_of_stock' | 'limited' = 'in_stock';
       const availabilitySelectors = [
@@ -398,6 +833,7 @@ async function scrapeAmazon(page: any, url: string): Promise<ScrapedProduct | nu
         title,
         price,
         originalPrice,
+        weight,
         image,
         rating,
         reviewCount,
@@ -702,15 +1138,10 @@ export async function POST(request: NextRequest) {
     // Scrape based on store
     switch (store) {
       case 'amazon':
-        product = await scrapeAmazon(page, url);
-        // If Puppeteer fails, try fallback method
-        if (!product) {
-          console.log('Puppeteer failed, trying fallback method...');
-          await browser.close();
-          product = await scrapeAmazonFallback(url);
-        } else {
-          await browser.close();
-        }
+        // Use ScraperAPI only
+        console.log('Using ScraperAPI...');
+        product = await scrapeAmazonWithScraperAPI(url);
+        await browser.close();
         break;
       case 'walmart':
         product = await scrapeWalmart(page, url);
@@ -724,7 +1155,7 @@ export async function POST(request: NextRequest) {
 
     if (!product) {
       return NextResponse.json(
-        { success: false, error: 'Failed to extract product information. The page structure might have changed, the product may not be available, or the website is blocking our requests. Please try again later.' },
+        { success: false, error: 'We were unable to process this product URL. Please verify the link is correct or contact our support team for assistance.' },
         { status: 500 }
       );
     }
@@ -744,7 +1175,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Scraping error:', error);
     return NextResponse.json(
-      { success: false, error: 'An error occurred while processing the product link. Please try again.' },
+      { success: false, error: 'We were unable to process this product URL. Please verify the link is correct or contact our support team for assistance.' },
       { status: 500 }
     );
   }
