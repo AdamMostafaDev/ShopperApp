@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useCart } from '@/lib/cart-context';
@@ -283,7 +283,7 @@ function CheckoutForm({ clientSecret, orderData, setPaymentSuccessful, session }
   );
 }
 
-export default function CheckoutPage() {
+function CheckoutPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { data: session } = useSession();
@@ -436,5 +436,13 @@ export default function CheckoutPage() {
     >
       <CheckoutForm clientSecret={clientSecret} orderData={orderData} setPaymentSuccessful={setPaymentSuccessful} session={session} />
     </Elements>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading checkout...</div>}>
+      <CheckoutPageContent />
+    </Suspense>
   );
 }
