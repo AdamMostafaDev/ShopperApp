@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useCart } from '@/lib/cart-context';
 import { formatBdtPrice } from '@/lib/currency';
 import { calculateCartTotals } from '@/lib/shipping';
+import { displayShipping } from '@/lib/display-utils';
 import { ChevronRightIcon } from '@heroicons/react/24/outline';
 import countryList from 'react-select-country-list';
 import { type AddressComponents } from '@/lib/address-validation';
@@ -566,6 +567,10 @@ export default function InformationPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Service Charge</span>
                   <span className="font-medium">{formatBdtPrice(totals.serviceCharge)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Shipping & Fees</span>
+                  <span className="font-medium">{displayShipping(totals.shipping || 0)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Estimated taxes</span>

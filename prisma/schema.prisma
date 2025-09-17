@@ -8,26 +8,26 @@ datasource db {
 }
 
 model User {
-  id                 Int          @id @default(autoincrement())
   email              String       @unique
   email_lower        String?      @unique
-  firstName          String?      @map("first_name")
-  lastName           String?      @map("last_name")
-  phone              String?
-  country            String?
+  emailVerified      DateTime?    @map("email_verified")
   image              String?
   role               Role         @default(USER)
   password           String?
-  emailVerified      DateTime?    @map("email_verified")
   reset_token        String?      @unique
   reset_token_expiry DateTime?
   two_factor_secret  String?
   twoFactorEnabled   Boolean      @default(false) @map("two_factor_enabled")
-  loginAttempts      Int          @default(0) @map("login_attempts")
-  lockedUntil        DateTime?    @map("locked_until")
-  lastLoginAt        DateTime?    @map("last_login_at")
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
+  lastLoginAt        DateTime?    @map("last_login_at")
+  loginAttempts      Int          @default(0) @map("login_attempts")
+  lockedUntil        DateTime?    @map("locked_until")
+  country            String?
+  phone              String?
+  firstName          String?      @map("first_name")
+  lastName           String?      @map("last_name")
+  id                 Int          @id @default(autoincrement())
   accounts           Account[]
   addresses          Address[]
   audit_logs         audit_logs[]
@@ -40,8 +40,6 @@ model User {
 }
 
 model Account {
-  id                Int     @id @default(autoincrement())
-  userId            Int     @map("user_id")
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
@@ -52,6 +50,8 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
+  id                Int     @id @default(autoincrement())
+  userId            Int     @map("user_id")
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
@@ -59,81 +59,109 @@ model Account {
 }
 
 model Session {
-  id           Int      @id @default(autoincrement())
-  userId       Int      @map("user_id")
   sessionToken String   @unique @map("session_token")
   expires      DateTime
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
 }
 
 model Order {
-  id                        Int               @id @default(autoincrement())
-  userId                    Int               @map("user_id")
-  orderNumber               String            @unique
   status                    OrderStatus       @default(PENDING)
+  createdAt                 DateTime          @default(now()) @map("created_at")
+  updatedAt                 DateTime          @updatedAt @map("updated_at")
   fulfillmentStatus         FulfillmentStatus @default(PENDING) @map("fulfillment_status")
-  paymentStatus             PaymentStatus     @default(PENDING) @map("payment_status")
+  paymentStatus             PaymentStatus     @default(PROCESSING) @map("payment_status")
+  cancelledAt               DateTime?         @map("cancelled_at")
   customerEmail             String            @map("customer_email")
   customerPhone             String?           @map("customer_phone")
   items                     Json
+  refundDeadline            DateTime?         @map("refund_deadline")
   shippingAddress           Json              @map("shipping_address")
+  stripeCheckoutId          String?           @map("stripe_checkout_id")
+  stripePaymentIntentId     String?           @map("stripe_payment_intent_id")
   totalWeight               Decimal           @map("total_weight") @db.Decimal(10, 3)
   currency                  String?           @default("BDT")
   exchangeRate              Decimal?          @map("exchange_rate") @db.Decimal(10, 4)
   exchangeRateProvider      String?           @default("exchange-api") @map("exchange_rate_provider")
+  totalAmountUsd            Decimal?          @map("total_amount_usd") @db.Decimal(10, 2)
   productCostBdt            Decimal           @map("product_cost_bdt") @db.Decimal(10, 2)
   productCostUsd            Decimal?          @map("product_cost_usd") @db.Decimal(10, 2)
   serviceChargeBdt          Decimal           @map("service_charge_bdt") @db.Decimal(10, 2)
   serviceChargeUsd          Decimal?          @map("service_charge_usd") @db.Decimal(10, 2)
-  shippingCostBdt           Decimal           @map("shipping_cost_bdt") @db.Decimal(10, 2)
+  shippingCostBdt           Decimal           @default(0) @map("shipping_cost_bdt") @db.Decimal(10, 2)
+  shippingCostUsd           Decimal?          @default(0) @map("shipping_cost_usd") @db.Decimal(10, 2)
   taxBdt                    Decimal           @default(0) @map("tax_bdt") @db.Decimal(10, 2)
   taxUsd                    Decimal?          @map("tax_usd") @db.Decimal(10, 2)
   totalAmountBdt            Decimal           @map("total_amount_bdt") @db.Decimal(10, 2)
-  totalAmountUsd            Decimal?          @map("total_amount_usd") @db.Decimal(10, 2)
-  stripeCheckoutId          String?           @map("stripe_checkout_id")
-  stripePaymentIntentId     String?           @map("stripe_payment_intent_id")
+
+  // Final pricing fields (after admin update)
+  finalPricingUpdated       Boolean           @default(false) @map("final_pricing_updated")
+  customerConfirmationStatus String?          @default("pending") @map("customer_confirmation_status")
+  finalProductCostBdt       Decimal?          @map("final_product_cost_bdt") @db.Decimal(10, 2)
+  finalProductCostUsd       Decimal?          @map("final_product_cost_usd") @db.Decimal(10, 2)
+  finalServiceChargeBdt     Decimal?          @map("final_service_charge_bdt") @db.Decimal(10, 2)
+  finalServiceChargeUsd     Decimal?          @map("final_service_charge_usd") @db.Decimal(10, 2)
+  finalShippingCostBdt      Decimal?          @map("final_shipping_cost_bdt") @db.Decimal(10, 2)
+  finalShippingCostUsd      Decimal?          @map("final_shipping_cost_usd") @db.Decimal(10, 2)
+
+  // Shipping/fees breakdown fields
+  finalShippingOnlyBdt      Decimal?          @map("final_shipping_only_bdt") @db.Decimal(10, 2)
+  finalShippingOnlyUsd      Decimal?          @map("final_shipping_only_usd") @db.Decimal(10, 2)
+  finalAdditionalFeesBdt    Decimal?          @map("final_additional_fees_bdt") @db.Decimal(10, 2)
+  finalAdditionalFeesUsd    Decimal?          @map("final_additional_fees_usd") @db.Decimal(10, 2)
+  feeDescription            String?           @map("fee_description")
+
+  finalTaxBdt               Decimal?          @map("final_tax_bdt") @db.Decimal(10, 2)
+  finalTaxUsd               Decimal?          @map("final_tax_usd") @db.Decimal(10, 2)
+  finalTotalAmountBdt       Decimal?          @map("final_total_amount_bdt") @db.Decimal(10, 2)
+  finalTotalAmountUsd       Decimal?          @map("final_total_amount_usd") @db.Decimal(10, 2)
+  finalItems                Json?             @map("final_items")
+  adminNotes                String?           @map("admin_notes") @db.Text
+  pricingUpdatedAt          DateTime?         @map("pricing_updated_at")
+  customerResponseDeadline  DateTime?         @map("customer_response_deadline")
+
+  orderNumber               String            @unique
+  id                        Int               @id @default(autoincrement())
+  userId                    Int               @map("user_id")
+  deliveredStatus           TrackingStatus    @default(PENDING) @map("delivered_status")
   orderPlacedStatus         TrackingStatus    @default(COMPLETE) @map("order_placed_status")
+  outForDeliveryStatus      TrackingStatus    @default(PENDING) @map("out_for_delivery_status")
   paymentConfirmationStatus TrackingStatus    @default(PROCESSING) @map("payment_confirmation_status")
   shippedStatus             TrackingStatus    @default(PENDING) @map("shipped_status")
-  outForDeliveryStatus      TrackingStatus    @default(PENDING) @map("out_for_delivery_status")
-  deliveredStatus           TrackingStatus    @default(PENDING) @map("delivered_status")
-  refundDeadline            DateTime?         @map("refund_deadline")
-  cancelledAt               DateTime?         @map("cancelled_at")
-  createdAt                 DateTime          @default(now()) @map("created_at")
-  updatedAt                 DateTime          @updatedAt @map("updated_at")
   user                      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("orders")
 }
 
 model Address {
-  id         Int     @id @default(autoincrement())
-  userId     Int     @map("user_id")
-  firstName  String? @map("first_name")
-  lastName   String? @map("last_name")
   street1    String  @map("street_1")
   street2    String? @map("street_2")
   city       String
   state      String?
   postalCode String  @map("postal_code")
   country    String
-  phone      String?
   isDefault  Boolean @default(false) @map("is_default")
+  id         Int     @id @default(autoincrement())
+  userId     Int     @map("user_id")
+  firstName  String? @map("first_name")
+  lastName   String? @map("last_name")
+  phone      String?
   user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("addresses")
 }
 
 model audit_logs {
-  id         Int      @id @default(autoincrement())
-  user_id    Int?
   action     String
   details    Json?
   ip_address String?
   user_agent String?
   created_at DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  user_id    Int?
   users      User?    @relation(fields: [user_id], references: [id])
 
   @@index([action])
@@ -150,31 +178,31 @@ model verification_tokens {
 }
 
 model Admin {
-  id                 Int           @id @default(autoincrement())
-  email              String        @unique
-  email_lower        String?       @unique
-  firstName          String?       @map("first_name")
-  lastName           String?       @map("last_name")
-  username           String?       @unique
+  id                 Int               @id @default(autoincrement())
+  email              String            @unique
+  email_lower        String?           @unique
+  firstName          String?           @map("first_name")
+  lastName           String?           @map("last_name")
+  username           String?           @unique
   password           String
-  role               AdminRole     @default(ADMIN)
+  role               AdminRole         @default(ADMIN)
   permissions        AdminPermission[]
-  isActive           Boolean       @default(true) @map("is_active")
-  loginAttempts      Int           @default(0) @map("login_attempts")
-  lockedUntil        DateTime?     @map("locked_until")
-  lastLoginAt        DateTime?     @map("last_login_at")
-  lastLoginIp        String?       @map("last_login_ip")
-  passwordChangedAt  DateTime?     @map("password_changed_at")
-  mustChangePassword Boolean       @default(true) @map("must_change_password")
-  twoFactorEnabled   Boolean       @default(false) @map("two_factor_enabled")
-  twoFactorSecret    String?       @map("two_factor_secret")
-  createdAt          DateTime      @default(now()) @map("created_at")
-  updatedAt          DateTime      @updatedAt @map("updated_at")
-  createdById        Int?          @map("created_by_id")
-  createdBy          Admin?        @relation("AdminCreatedBy", fields: [createdById], references: [id])
-  createdAdmins      Admin[]       @relation("AdminCreatedBy")
-  adminSessions      AdminSession[]
+  isActive           Boolean           @default(true) @map("is_active")
+  loginAttempts      Int               @default(0) @map("login_attempts")
+  lockedUntil        DateTime?         @map("locked_until")
+  lastLoginAt        DateTime?         @map("last_login_at")
+  lastLoginIp        String?           @map("last_login_ip")
+  passwordChangedAt  DateTime?         @map("password_changed_at")
+  mustChangePassword Boolean           @default(true) @map("must_change_password")
+  twoFactorEnabled   Boolean           @default(false) @map("two_factor_enabled")
+  twoFactorSecret    String?           @map("two_factor_secret")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  createdById        Int?              @map("created_by_id")
   adminAuditLogs     AdminAuditLog[]
+  adminSessions      AdminSession[]
+  createdBy          Admin?            @relation("AdminCreatedBy", fields: [createdById], references: [id])
+  createdAdmins      Admin[]           @relation("AdminCreatedBy")
 
   @@index([email_lower])
   @@index([username])

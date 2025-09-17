@@ -28,8 +28,9 @@ export async function GET(request: NextRequest) {
         orderNumber: true,
         items: true,
         productCostBdt: true,
-        shippingCostBdt: true,
         serviceChargeBdt: true,
+        shippingCostBdt: true,
+        taxBdt: true,
         totalAmountBdt: true,
         status: true,
         paymentStatus: true,
@@ -38,6 +39,17 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         updatedAt: true,
         refundDeadline: true,
+        exchangeRate: true,
+        finalPricingUpdated: true,
+        finalProductCostBdt: true,
+        finalServiceChargeBdt: true,
+        finalShippingCostBdt: true,
+        finalShippingOnlyBdt: true,
+        finalAdditionalFeesBdt: true,
+        feeDescription: true,
+        finalTaxBdt: true,
+        finalTotalAmountBdt: true,
+        finalItems: true,
       },
     });
 
@@ -45,9 +57,19 @@ export async function GET(request: NextRequest) {
     const mappedOrders = orders.map(order => ({
       ...order,
       productCostBdt: Number(order.productCostBdt || 0),
-      shippingCostBdt: Number(order.shippingCostBdt || 0), 
       serviceChargeBdt: Number(order.serviceChargeBdt || 0),
-      totalAmountBdt: Number(order.totalAmountBdt || 0)
+      shippingCostBdt: Number(order.shippingCostBdt || 0),
+      taxBdt: Number(order.taxBdt || 0),
+      totalAmountBdt: Number(order.totalAmountBdt || 0),
+      exchangeRate: Number(order.exchangeRate || 121.5),
+      finalProductCostBdt: order.finalProductCostBdt ? Number(order.finalProductCostBdt) : null,
+      finalServiceChargeBdt: order.finalServiceChargeBdt ? Number(order.finalServiceChargeBdt) : null,
+      finalShippingCostBdt: order.finalShippingCostBdt ? Number(order.finalShippingCostBdt) : null,
+      finalShippingOnlyBdt: order.finalShippingOnlyBdt ? Number(order.finalShippingOnlyBdt) : null,
+      finalAdditionalFeesBdt: order.finalAdditionalFeesBdt ? Number(order.finalAdditionalFeesBdt) : null,
+      feeDescription: order.feeDescription || null,
+      finalTaxBdt: order.finalTaxBdt ? Number(order.finalTaxBdt) : null,
+      finalTotalAmountBdt: order.finalTotalAmountBdt ? Number(order.finalTotalAmountBdt) : null,
     }));
 
     return NextResponse.json({

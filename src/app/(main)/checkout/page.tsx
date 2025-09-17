@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useCart } from '@/lib/cart-context';
 import { formatBdtPrice } from '@/lib/currency';
 import { calculateCartTotals } from '@/lib/shipping';
+import { displayShipping } from '@/lib/display-utils';
 import { loadStripe } from '@stripe/stripe-js';
 import {
   Elements,
@@ -236,6 +237,10 @@ function CheckoutForm({ clientSecret, orderData, setPaymentSuccessful, session }
                     <span className="font-medium">{formatBdtPrice(orderData.totals.serviceCharge)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Shipping & Fees</span>
+                    <span className="font-medium">{displayShipping(orderData.totals.shipping || 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Estimated taxes</span>
                     <span className="font-medium">{formatBdtPrice(orderData.totals.tax || 0)}</span>
                   </div>
@@ -288,11 +293,13 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [paymentSuccessful, setPaymentSuccessful] = useState(false);
+  const isCreatingPaymentIntent = useRef(false);
+  const hasCreatedPaymentIntent = useRef(false);
 
   useEffect(() => {
     // Don't check cart until it's loaded from localStorage
     if (!isInitialized) return;
-    
+
     // Don't redirect if payment was successful
     if (state.cart.items.length === 0 && !paymentSuccessful) {
       console.log('Cart is empty, redirecting to /cart');
@@ -310,7 +317,16 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Prevent duplicate payment intent creation using refs
+    if (isCreatingPaymentIntent.current || hasCreatedPaymentIntent.current || clientSecret) {
+      setLoading(false);
+      return;
+    }
+
     const createPaymentIntent = async () => {
+      // Mark that we're creating a payment intent
+      isCreatingPaymentIntent.current = true;
+
       try {
         const totals = calculateCartTotals(
           state.cart.items.map(item => ({
@@ -319,13 +335,18 @@ export default function CheckoutPage() {
             weight: item.product.weight
           }))
         );
-        
+
         console.log('🔍 Checkout totals result:', totals);
+
+        // Generate idempotency key based on cart contents (including quantities to prevent duplicates)
+        const cartHash = state.cart.items.map(i => `${i.product.id}:${i.quantity}`).sort().join('|');
+        const idempotencyKey = `checkout-${session?.user?.id || 'guest'}-${btoa(cartHash)}`;
 
         const response = await fetch('/api/create-payment-intent', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Idempotency-Key': idempotencyKey,
           },
           body: JSON.stringify({
             cartItems: state.cart.items,
@@ -345,18 +366,21 @@ export default function CheckoutPage() {
             totals,
             orderId: result.orderId
           });
+          hasCreatedPaymentIntent.current = true;
         } else {
           setError(result.error || 'Failed to initialize payment');
+          isCreatingPaymentIntent.current = false; // Reset on error to allow retry
         }
       } catch (err) {
         setError('Something went wrong. Please try again.');
+        isCreatingPaymentIntent.current = false; // Reset on error to allow retry
       } finally {
         setLoading(false);
       }
     };
 
     createPaymentIntent();
-  }, [isInitialized, state.cart, router, paymentSuccessful]);
+  }, [isInitialized, state.cart.items.length, router, paymentSuccessful, session?.user?.email]);
 
   if (loading) {
     return (

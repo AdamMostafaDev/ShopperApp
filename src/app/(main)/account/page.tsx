@@ -18,7 +18,6 @@ interface Order {
   orderNumber: string;
   items: any[];
   productCostBdt: number;
-  shippingCostBdt: number;
   serviceChargeBdt: number;
   totalAmountBdt: number;
   status: string;

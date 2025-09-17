@@ -10,10 +10,66 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 const prisma = new PrismaClient();
 
+// Store recent idempotency keys in memory (use Redis in production)
+const recentRequests = new Map<string, { orderId: number; clientSecret: string; timestamp: number }>();
+
+// Clean up old entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of recentRequests.entries()) {
+    if (now - value.timestamp > 5 * 60 * 1000) { // 5 minutes
+      recentRequests.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
 export async function POST(request: NextRequest) {
   try {
+    // Check for idempotency key
+    const idempotencyKey = request.headers.get('idempotency-key');
+
+    if (idempotencyKey) {
+      // First check memory cache
+      const existing = recentRequests.get(idempotencyKey);
+      if (existing) {
+        console.log('🔄 Returning existing payment intent from memory cache:', idempotencyKey);
+        return NextResponse.json({
+          success: true,
+          clientSecret: existing.clientSecret,
+          orderId: existing.orderId,
+          cached: true
+        });
+      }
+
+      // Check database for existing order with same idempotency key
+      const existingOrder = await prisma.order.findFirst({
+        where: {
+          stripeCheckoutId: idempotencyKey, // Use stripeCheckoutId to store idempotency key
+        }
+      });
+
+      if (existingOrder) {
+        console.log('🔄 Found existing order in database for idempotency key:', idempotencyKey);
+
+        // Get the payment intent from Stripe to return client secret
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(existingOrder.stripePaymentIntentId!);
+
+          return NextResponse.json({
+            success: true,
+            clientSecret: paymentIntent.client_secret,
+            orderId: existingOrder.id,
+            cached: true
+          });
+        } catch (stripeError) {
+          console.error('Error retrieving existing payment intent:', stripeError);
+          // Continue to create new order if we can't retrieve the old one
+        }
+      }
+    }
+
     const session = await getServerSession(authConfig);
-    
+
     // Allow guest checkout - create guest user if no session
     const isGuest = !session?.user?.id;
 
@@ -91,39 +147,51 @@ export async function POST(request: NextRequest) {
     const result = await prisma.$queryRaw<{nextval: bigint}[]>`SELECT nextval('order_number_seq')`;
     const orderNumber = result[0].nextval.toString();
 
+    // Transform cart items to include individual price fields
+    const transformedItems = cartItems.map((item: any) => ({
+      ...item,
+      price: item.product.price, // Extract price from product and put it at item level
+      originalPrice: item.product.originalPrice,
+      originalPriceValue: item.product.originalPriceValue
+    }));
+
     // Create order in database first
     const order = await prisma.order.create({
       data: {
         orderNumber,
         userId: userId!,
-        items: cartItems,
+        items: transformedItems,
         // BDT amounts (what customer sees/pays)
         productCostBdt: subtotalBdt,
-        shippingCostBdt: 0, // Free shipping for now
         serviceChargeBdt: serviceChargeBdt,
+        shippingCostBdt: 0, // Set to 0, admin will update later
         taxBdt: taxBdt, // 8.875% tax on goods only
         totalAmountBdt: totalAmountBdt,
         totalWeight: totals.totalWeight,
-        
+
         // USD amounts (original prices for purchasing)
         productCostUsd: subtotalUsd,
         serviceChargeUsd: serviceChargeUsd,
+        shippingCostUsd: 0, // Set to 0, admin will update later
         taxUsd: taxUsd,
         totalAmountUsd: totalAmountUsd,
         exchangeRate: usdToBdtRate,
         currency: 'BDT',
         exchangeRateProvider: 'exchange-api',
-        
+
         customerEmail: customerInfo.email || session?.user?.email || `guest-${Date.now()}@unishopper.com`,
         shippingAddress: {}, // Will be filled by Payment Element
         refundDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
         status: 'PENDING',
         paymentStatus: 'PENDING',
         fulfillmentStatus: 'PENDING',
-        
+
+        // Store idempotency key in stripeCheckoutId for database-based deduplication
+        stripeCheckoutId: idempotencyKey,
+
         // Order tracking statuses with defaults
         orderPlacedStatus: 'COMPLETE',
-        paymentConfirmationStatus: 'PROCESSING', 
+        paymentConfirmationStatus: 'PROCESSING',
         shippedStatus: 'PENDING',
         outForDeliveryStatus: 'PENDING',
         deliveredStatus: 'PENDING'
@@ -163,6 +231,15 @@ export async function POST(request: NextRequest) {
     });
 
     console.log('✅ Payment Intent created:', paymentIntent.id);
+
+    // Store in idempotency cache
+    if (idempotencyKey) {
+      recentRequests.set(idempotencyKey, {
+        orderId: order.id,
+        clientSecret: paymentIntent.client_secret!,
+        timestamp: Date.now()
+      });
+    }
 
     return NextResponse.json({
       success: true,

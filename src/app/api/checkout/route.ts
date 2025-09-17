@@ -70,8 +70,8 @@ export async function POST(request: NextRequest) {
         userId: parseInt(session.user.id), // Convert string to int
         items: cartItems,
         productCostBdt: totals.subtotal,
-        shippingCostBdt: totals.shippingCost,
         serviceChargeBdt: totals.serviceCharge,
+        shippingCostBdt: 0, // Set to 0, admin will update later
         totalAmountBdt: totals.total,
         taxBdt: totals.tax || 0,
         totalWeight: totals.totalWeight,
@@ -102,20 +102,7 @@ export async function POST(request: NextRequest) {
       quantity: item.quantity,
     }));
 
-    // Add shipping as a line item
-    if (totals.shippingCost > 0) {
-      lineItems.push({
-        price_data: {
-          currency: 'bdt',
-          product_data: {
-            name: `Shipping (${totals.totalWeight.toFixed(1)}kg)`,
-            description: 'International shipping to Bangladesh'
-          },
-          unit_amount: Math.round(totals.shippingCost * 100),
-        },
-        quantity: 1,
-      });
-    }
+    // Shipping will be calculated later during price confirmation
 
     // Add service charge as a line item
     if (totals.serviceCharge > 0) {

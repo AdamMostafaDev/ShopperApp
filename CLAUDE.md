@@ -2,9 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Session Start Protocol
+## SESSION START PROTOCOL
 
-**IMPORTANT**: Always review this CLAUDE.md file at the start of every session to understand project-specific rules and conventions before taking any actions.
+**CRITICAL**: Always review this CLAUDE.md file at the start of EVERY session to understand project-specific rules and conventions before taking any actions.
+
+## ABSOLUTE CORE RULE - NEVER VIOLATE THIS
+
+**DO EXACTLY WHAT THE USER TELLS YOU TO DO - NOTHING MORE, NOTHING LESS**
+
+- NEVER make changes without explicit user instructions
+- NEVER assume what the user wants
+- NEVER be proactive beyond what is asked
+- ALWAYS wait for instructions after completing a task
+- STOP and WAIT for user input after finishing ANY task
 
 ## Feature Development Protocol
 
@@ -13,6 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 2. Present the plan to the user for approval before proceeding
 3. Only begin implementation after user confirms the approach
 4. This applies to ALL new features, components, or significant changes
+5. **AFTER COMPLETING ANY FEATURE - STOP AND WAIT FOR INSTRUCTIONS**
 
 ## Task Management Protocol
 
@@ -30,13 +41,6 @@ Example format:
 - [ ] Add currency conversion
 - [ ] Test end-to-end functionality
 ```
-
-## Common Commands
-
-- `npm run dev` - Start development server with Turbopack
-- `npm run build` - Build the application for production
-- `npm run start` - Start production server
-- `npm run lint` - Run ESLint for code quality checks
 
 ### Development Server Management
 When making changes and restarting the development server:
@@ -88,66 +92,60 @@ The project uses Prisma with PostgreSQL:
 - Follow established patterns in existing code before creating new patterns
 - Database schemas should be readable from left to right in logical order
 
-## Web Scraping & Search
 
-The project uses a custom scraper API system for product search and data extraction:
-- Search functionality leverages web scraping rather than traditional product APIs
-- Product searches are performed via scraping major e-commerce sites
-- Rate limiting and caching are implemented to manage scraper performance
-- Anti-bot detection measures are in place for reliable data extraction
-
-## Architecture Overview
-
-### Core Technologies
-- **Framework**: Next.js 15 with App Router
-- **Language**: TypeScript with strict mode enabled
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: NextAuth.js with Prisma adapter
-- **Styling**: Tailwind CSS v4
-- **Web Scraping**: Puppeteer, Cheerio, JSDOM for product data extraction
-
-### Key Directory Structure
-- `/src/app/` - Next.js App Router pages and API routes
-- `/src/components/` - Reusable React components
-- `/src/lib/` - Shared utilities and configurations
-- `/src/data/` - Static data and mock content
-- `/src/types/` - TypeScript type definitions
-- `/prisma/` - Database schema and migrations
-
-### State Management
-- **Cart State**: React Context API (`src/lib/cart-context.tsx`)
-- **User Authentication**: NextAuth.js sessions
-- **Database**: Prisma Client with connection pooling
-
-### Web Scraping System
-The application features a sophisticated product capture system:
-- **Multi-platform Support**: Amazon, Walmart, eBay product extraction
-- **Anti-bot Protection**: Rotating user agents and Puppeteer stealth mode
-- **Rate Limiting**: Flexible rate limiting to prevent IP blocking
-- **Caching**: Smart caching layer for scraped product data
-- **Error Handling**: Comprehensive error handling with fallback strategies
-
-### Security Features
-- **Authentication**: Secure user authentication with password hashing (Argon2)
-- **Rate Limiting**: API endpoint protection against abuse
-- **Audit Logging**: Comprehensive audit trail for user actions
-- **Input Validation**: Zod schema validation for all inputs
-- **CSRF Protection**: Built-in NextAuth.js CSRF protection
-
-### API Routes
-- `/api/auth/[...nextauth]` - NextAuth.js authentication endpoints
-- `/api/auth/signup` - User registration
-- `/api/capture-product` - Product URL scraping and data extraction
-- `/api/search` - Product search functionality
-
-### Path Aliases
-Uses `@/*` for `./src/*` imports throughout the codebase.
-
-### Development Notes
-- Uses Turbopack for faster development builds
-- ESLint configured with Next.js TypeScript rules
-- Strict TypeScript configuration with proper path mapping
-- Database migrations tracked in `/prisma/migrations/`
 
 ### Testing & Quality
 Run `npm run lint` before committing changes to ensure code quality standards.
+
+## CRITICAL DEPLOYMENT SAFETY RULES
+
+**NEVER RUN THESE COMMANDS - THEY KILL CLAUDE PROCESSES:**
+- `Stop-Process -Name node -Force` (PowerShell)
+- `taskkill /f /im node.exe` (Windows)
+- `killall node` (Unix/Linux)
+- Any command that forcefully kills ALL node processes
+
+**SAFE NODE SERVICE MANAGEMENT FOR NEXT.JS DEPLOYMENT:**
+
+### Step 1: Check Running Node Processes
+```bash
+# List all node processes with details
+powershell "Get-Process node | Select-Object Id,ProcessName,StartTime,Path"
+```
+
+### Step 2: Identify Next.js Development Server Process
+```bash
+# Find Next.js dev server (usually runs on port 3000)
+powershell "netstat -ano | findstr :3000"
+```
+
+### Step 3: Kill ONLY the Next.js Development Server
+```bash
+# Kill by specific PID (replace XXXX with actual PID from Step 2)
+powershell "Stop-Process -Id XXXX -Force"
+
+# OR use Ctrl+C in the terminal where npm run dev is running
+```
+
+### Step 4: Clean Restart Next.js Application
+```bash
+# 1. Start fresh development server
+npm run dev
+
+# 2. If needed, regenerate Prisma client
+npx prisma generate
+
+# 3. If database schema changed, apply migrations
+npx prisma migrate dev
+```
+
+### Alternative Safe Approach (Terminal-based)
+1. Open the terminal where `npm run dev` is running
+2. Press `Ctrl+C` to gracefully stop the development server
+3. Wait for the process to fully terminate
+4. Run `npm run dev` again to restart
+
+**WHY THIS MATTERS:**
+- Claude Code runs on Node.js processes
+- Killing all node processes terminates Claude and interrupts your session
+- Always target specific processes by PID or use graceful shutdown methods

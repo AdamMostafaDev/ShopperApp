@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { CheckCircleIcon, XCircleIcon, CubeIcon, CheckIcon, TruckIcon, HomeIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, XCircleIcon, CubeIcon, CheckIcon, TruckIcon, HomeIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { formatBdtPrice } from '@/lib/currency';
+import { displayShipping, displayAmount, getDisplayAmounts, getUpdatedItemPrices } from '@/lib/display-utils';
 import { useCart } from '@/lib/cart-context';
 
 interface Order {
@@ -32,6 +33,24 @@ interface Order {
   shippedStatus: 'PENDING' | 'PROCESSING' | 'COMPLETE';
   outForDeliveryStatus: 'PENDING' | 'PROCESSING' | 'COMPLETE';
   deliveredStatus: 'PENDING' | 'PROCESSING' | 'COMPLETE';
+
+  // Pricing fields for display utils
+  productCostBdt: number;
+  serviceChargeBdt: number;
+  shippingCostBdt: number;
+  taxBdt: number;
+  totalAmountBdt: number;
+  exchangeRate: number;
+  finalPricingUpdated?: boolean;
+  finalProductCostBdt?: number;
+  finalServiceChargeBdt?: number;
+  finalShippingCostBdt?: number;
+  finalShippingOnlyBdt?: number;
+  finalAdditionalFeesBdt?: number;
+  feeDescription?: string;
+  finalTaxBdt?: number;
+  finalTotalAmountBdt?: number;
+  finalItems?: any[];
 }
 
 export default function OrderPage() {
@@ -42,6 +61,7 @@ export default function OrderPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [shippingExpanded, setShippingExpanded] = useState(false);
   
   const isSuccess = searchParams.get('success') === 'true';
 
@@ -447,34 +467,46 @@ export default function OrderPage() {
               </h2>
               
               <div className="space-y-4">
-                {order.items.map((item: any, index: number) => (
-                  <div key={index} className="flex items-center space-x-4">
-                    <div className="relative flex-shrink-0">
-                      <img
-                        src={item.product.image}
-                        alt={item.product.title}
-                        className="w-16 h-16 object-cover rounded-lg"
-                        onError={(e) => {
-                          e.currentTarget.src = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" fill="%23f3f4f6"/><text x="32" y="32" text-anchor="middle" dy=".3em" fill="%236b7280" font-family="Arial" font-size="10">Image</text></svg>`;
-                        }}
-                      />
-                      <span className="absolute -top-2 -right-2 bg-gray-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {item.quantity}
-                      </span>
+                {(() => {
+                  const updatedItems = getUpdatedItemPrices(order);
+                  const amounts = getDisplayAmounts(order);
+
+                  return updatedItems.map((item: any, index: number) => (
+                    <div key={index} className="flex items-center space-x-4">
+                      <div className="relative flex-shrink-0">
+                        <img
+                          src={item.product.image}
+                          alt={item.product.title}
+                          className="w-16 h-16 object-cover rounded-lg"
+                          onError={(e) => {
+                            e.currentTarget.src = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" fill="%23f3f4f6"/><text x="32" y="32" text-anchor="middle" dy=".3em" fill="%236b7280" font-family="Arial" font-size="10">Image</text></svg>`;
+                          }}
+                        />
+                        <span className="absolute -top-2 -right-2 bg-gray-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                          {item.quantity}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-medium text-gray-900 truncate">
+                          {item.product.title}
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          {item.product.store}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-gray-900">
+                          {displayAmount(item.price * item.quantity, 'BDT')}
+                        </div>
+                        {item.priceUpdated && (
+                          <div className="text-xs text-green-600 font-medium">
+                            Updated
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-gray-900 truncate">
-                        {item.product.title}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {item.product.store}
-                      </p>
-                    </div>
-                    <div className="text-sm font-medium text-gray-900">
-                      {formatBdtPrice(item.product.price * item.quantity)}
-                    </div>
-                  </div>
-                ))}
+                  ));
+                })()}
               </div>
             </div>
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -484,26 +516,88 @@ export default function OrderPage() {
               
               {/* Totals */}
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium">{formatBdtPrice(order.subtotal)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Service Charge</span>
-                  <span className="font-medium">{formatBdtPrice(order.serviceCharge)}</span>
-                </div>
-                {order.tax && order.tax > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Tax</span>
-                    <span className="font-medium">{formatBdtPrice(order.tax)}</span>
-                  </div>
-                )}
-                <div className="border-t border-gray-200 pt-2">
-                  <div className="flex justify-between">
-                    <span className="text-base font-semibold">Total</span>
-                    <span className="text-base font-bold">{formatBdtPrice(order.totalAmount)}</span>
-                  </div>
-                </div>
+                {(() => {
+                  const amounts = getDisplayAmounts(order);
+                  return (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Product Cost</span>
+                        <span className="font-medium">{displayAmount(amounts.productCostBdt, 'BDT')}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Service Charge</span>
+                        <span className="font-medium">{displayAmount(amounts.serviceChargeBdt, 'BDT')}</span>
+                      </div>
+                      {/* Shipping & Fees display - Collapsible */}
+                      {(() => {
+                        const hasAdditionalFees = amounts.finalAdditionalFeesBdt && amounts.finalAdditionalFeesBdt > 0;
+                        const shippingTotal = amounts.shippingCostBdt;
+
+                        return (
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <div
+                                className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 py-1 rounded flex-1"
+                                onClick={() => setShippingExpanded(!shippingExpanded)}
+                              >
+                                <ChevronDownIcon
+                                  className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${
+                                    shippingExpanded ? 'rotate-0' : '-rotate-90'
+                                  }`}
+                                />
+                                <span className="text-gray-600">Shipping & Fees</span>
+                              </div>
+                              <span className="font-medium">{displayShipping(shippingTotal, 'BDT')}</span>
+                            </div>
+
+                            {shippingExpanded && (
+                              <div className="ml-6 space-y-2 border-l-2 border-gray-200 pl-4">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600">Shipping Cost</span>
+                                  <span className="font-medium">{displayShipping(amounts.finalShippingOnlyBdt || amounts.shippingCostBdt || 0, 'BDT')}</span>
+                                </div>
+
+                                {hasAdditionalFees && (
+                                  <>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-gray-600">Additional Fees</span>
+                                      <span className="font-medium">{displayShipping(amounts.finalAdditionalFeesBdt, 'BDT')}</span>
+                                    </div>
+
+                                    {amounts.feeDescription && (
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600 text-sm">Fee Description</span>
+                                        <span className="text-sm text-gray-700 font-medium">{amounts.feeDescription}</span>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Tax</span>
+                        <span className="font-medium">{displayAmount(amounts.taxBdt, 'BDT')}</span>
+                      </div>
+                      <div className="border-t border-gray-200 pt-2">
+                        <div className="flex justify-between">
+                          <span className="text-base font-semibold">Total</span>
+                          <span className="text-base font-bold">{displayAmount(amounts.totalAmountBdt, 'BDT')}</span>
+                        </div>
+                      </div>
+                      {amounts.isUpdated && (
+                        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <p className="text-sm text-green-800 font-medium">
+                            <CheckCircleIcon className="inline h-4 w-4 mr-2" />
+                            You're seeing the most up-to-date product and shipping costs.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>

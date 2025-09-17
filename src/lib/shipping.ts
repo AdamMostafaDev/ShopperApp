@@ -30,6 +30,7 @@ export function calculateCartTotals(items: Array<{price: number, quantity: numbe
   
   const result = {
     subtotal,
+    shipping: shippingCost, // Add shipping alias for compatibility
     shippingCost,
     serviceCharge,
     tax,

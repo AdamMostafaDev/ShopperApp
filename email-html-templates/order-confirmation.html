@@ -121,24 +121,20 @@
                                             <tr>
                                                 <td style="padding: 5px 0; color: #7f8c8d;">Order Number:</td>
                                                 <td align="right"
-                                                    style="padding: 5px 0; color: #2c3e50; font-weight: bold;">{{
-                                                    event.order_number }}</td>
+                                                    style="padding: 5px 0; color: #2c3e50; font-weight: bold;">{{event.order_number}}</td>
                                             </tr>
                                             <tr>
                                                 <td style="padding: 5px 0; color: #7f8c8d;">Order Date:</td>
-                                                <td align="right" style="padding: 5px 0; color: #2c3e50;">{{
-                                                    event.formatted_order_date }}</td>
+                                                <td align="right" style="padding: 5px 0; color: #2c3e50;">{{event.formatted_order_date}}</td>
                                             </tr>
                                             <tr>
                                                 <td style="padding: 5px 0; color: #7f8c8d;">Order Total:</td>
                                                 <td align="right"
-                                                    style="padding: 5px 0; color: #2c3e50; font-weight: bold;">{{
-                                                    event.formatted_total_bdt }}</td>
+                                                    style="padding: 5px 0; color: #2c3e50; font-weight: bold;">{{event.formatted_total_bdt}}</td>
                                             </tr>
                                             <tr>
                                                 <td style="padding: 5px 0; color: #7f8c8d;">Exchange Rate:</td>
-                                                <td align="right" style="padding: 5px 0; color: #2c3e50;">{{
-                                                    event.exchange_rate }} BDT/USD</td>
+                                                <td align="right" style="padding: 5px 0; color: #2c3e50;">{{event.exchange_rate}} BDT/USD</td>
                                             </tr>
                                         </table>
                                     </td>
@@ -206,7 +202,7 @@
                                     <td align="right" style="padding: 8px 0;">৳{{ event.tax_bdt }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding: 8px 0;">Shipping:</td>
+                                    <td style="padding: 8px 0;">Shipping & Fees:</td>
                                     <td align="right" style="padding: 8px 0; color: #27ae60;">TBD (within 24hrs)</td>
                                 </tr>
                                 <tr style="border-top: 2px solid #ecf0f1;">
@@ -242,6 +238,14 @@
                                             <tr>
                                                 <td width="50%" valign="top" style="padding-right: 20px;">
                                                     <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 16px;">
+                                                        Delivery Address</h4>
+                                                    <p
+                                                        style="color: #2c3e50; margin: 0; font-size: 14px; line-height: 1.6;">
+                                                        {{ event.customer_address|safe }}
+                                                    </p>
+                                                </td>
+                                                <td width="50%" valign="top" style="padding-left: 20px;">
+                                                    <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 16px;">
                                                         Contact Information</h4>
                                                     <p
                                                         style="color: #2c3e50; margin: 0; font-size: 14px; line-height: 1.6;">
@@ -249,25 +253,18 @@
                                                         {{ event.customer_phone }}
                                                     </p>
                                                 </td>
-                                                <td width="50%" valign="top" style="padding-left: 20px;">
-                                                    <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 16px;">
-                                                        Delivery Address</h4>
-                                                    <p
-                                                        style="color: #2c3e50; margin: 0; font-size: 14px; line-height: 1.6;">
-                                                        {{ event.customer_address|safe }}
-                                                    </p>
-                                                </td>
                                             </tr>
                                         </table>
-
-                                        <p
-                                            style="color: #7f8c8d; margin: 15px 0 0 0; font-size: 12px; text-align: center;">
-                                            📦 Your order will be processed within 24 hours and final prices will be
-                                            calculated based on current rates
-                                        </p>
                                     </td>
                                 </tr>
                             </table>
+
+                            <!-- Order processing note moved outside grey box -->
+                            <p
+                                style="color: #7f8c8d; margin: 15px 0 0 0; font-size: 12px; text-align: center;">
+                                📦 Your order will be processed within 24 hours and final prices will be
+                                calculated based on current rates
+                            </p>
                         </td>
                     </tr>
                     <!-- CTA Buttons -->
