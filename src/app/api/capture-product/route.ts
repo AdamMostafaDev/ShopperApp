@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
 import UserAgent from 'user-agents';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
@@ -858,186 +857,7 @@ async function scrapeAmazon(page: any, url: string): Promise<ScrapedProduct | nu
   }
 }
 
-async function scrapeWalmart(page: any, url: string): Promise<ScrapedProduct | null> {
-  try {
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
-    
-    // Wait for key elements to load
-    await page.waitForSelector('[data-automation-id="product-title"], h1', { timeout: 10000 });
 
-    const product = await page.evaluate(() => {
-      // Title
-      const titleSelectors = [
-        '[data-automation-id="product-title"]',
-        'h1[data-automation-id="product-title"]',
-        '.prod-ProductTitle',
-        'h1'
-      ];
-      
-      let title = '';
-      for (const selector of titleSelectors) {
-        const element = document.querySelector(selector);
-        if (element?.textContent?.trim()) {
-          title = element.textContent.trim();
-          break;
-        }
-      }
-
-      // Price
-      const priceSelectors = [
-        '[itemprop="price"]',
-        '[data-testid="price-current"]',
-        '.price-current',
-        '.price-group .price-current .price-characteristic'
-      ];
-
-      let price = 0;
-      for (const selector of priceSelectors) {
-        const element = document.querySelector(selector);
-        if (element?.textContent) {
-          const cleanPrice = element.textContent.replace(/[^0-9.,]/g, '').replace(',', '');
-          price = parseFloat(cleanPrice) || 0;
-          if (price > 0) break;
-        }
-      }
-
-      // Image
-      const imageSelectors = [
-        '.prod-hero-image-image',
-        '[data-testid="hero-image"] img',
-        '.prod-ProductImage img'
-      ];
-
-      let image = '';
-      for (const selector of imageSelectors) {
-        const element = document.querySelector(selector) as HTMLImageElement;
-        if (element?.src) {
-          image = element.src;
-          break;
-        }
-      }
-
-      // Rating
-      let rating;
-      const ratingElement = document.querySelector('.average-rating .average-rating-number');
-      if (ratingElement?.textContent) {
-        rating = parseFloat(ratingElement.textContent);
-      }
-
-      // Review count
-      let reviewCount;
-      const reviewElement = document.querySelector('.ReviewsHeader .f6');
-      if (reviewElement?.textContent) {
-        const reviewMatch = reviewElement.textContent.match(/(\d+)/);
-        if (reviewMatch) {
-          reviewCount = parseInt(reviewMatch[1]);
-        }
-      }
-
-      return {
-        title,
-        price,
-        image,
-        rating,
-        reviewCount,
-        availability: 'in_stock' as const
-      };
-    });
-
-    if (!product.title) {
-      throw new Error('Could not extract product title');
-    }
-
-    return {
-      ...product,
-      store: 'walmart'
-    } as ScrapedProduct;
-
-  } catch (error) {
-    console.error('Walmart scraping error:', error);
-    return null;
-  }
-}
-
-async function scrapeEbay(page: any, url: string): Promise<ScrapedProduct | null> {
-  try {
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
-    
-    // Wait for key elements to load
-    await page.waitForSelector('.x-item-title-label, #x-item-title', { timeout: 10000 });
-
-    const product = await page.evaluate(() => {
-      // Title
-      const titleSelectors = [
-        '.x-item-title-label',
-        '#x-item-title',
-        '.it-ttl'
-      ];
-      
-      let title = '';
-      for (const selector of titleSelectors) {
-        const element = document.querySelector(selector);
-        if (element?.textContent?.trim()) {
-          title = element.textContent.trim();
-          break;
-        }
-      }
-
-      // Price
-      const priceSelectors = [
-        '.notranslate',
-        '.u-flL.condText',
-        '.notranslate .price'
-      ];
-
-      let price = 0;
-      for (const selector of priceSelectors) {
-        const element = document.querySelector(selector);
-        if (element?.textContent?.includes('$')) {
-          const cleanPrice = element.textContent.replace(/[^0-9.,]/g, '').replace(',', '');
-          price = parseFloat(cleanPrice) || 0;
-          if (price > 0) break;
-        }
-      }
-
-      // Image
-      const imageSelectors = [
-        '#icImg',
-        '.ux-image-carousel-item img',
-        '.img img'
-      ];
-
-      let image = '';
-      for (const selector of imageSelectors) {
-        const element = document.querySelector(selector) as HTMLImageElement;
-        if (element?.src) {
-          image = element.src;
-          break;
-        }
-      }
-
-      return {
-        title,
-        price,
-        image,
-        availability: 'in_stock' as const
-      };
-    });
-
-    if (!product.title) {
-      throw new Error('Could not extract product title');
-    }
-
-    return {
-      ...product,
-      store: 'ebay'
-    } as ScrapedProduct;
-
-  } catch (error) {
-    console.error('eBay scraping error:', error);
-    return null;
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -1058,99 +878,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Launch browser with enhanced stealth settings
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
-        '--disable-extensions',
-        '--disable-plugins',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding'
-      ]
-    });
-
-    const page = await browser.newPage();
-
-    // Enhanced stealth configuration
-    await page.evaluateOnNewDocument(() => {
-      // Remove webdriver property
-      Object.defineProperty(navigator, 'webdriver', {
-        get: () => undefined,
-      });
-
-      // Mock plugins
-      Object.defineProperty(navigator, 'plugins', {
-        get: () => [1, 2, 3, 4, 5],
-      });
-
-      // Mock languages
-      Object.defineProperty(navigator, 'languages', {
-        get: () => ['en-US', 'en'],
-      });
-
-      // Override the `chrome` property
-      window.chrome = {
-        runtime: {},
-      };
-
-      // Override permissions
-      const originalQuery = window.navigator.permissions.query;
-      window.navigator.permissions.query = (parameters) => (
-        parameters.name === 'notifications' ?
-          Promise.resolve({ state: Cypress ? 'denied' : 'granted' }) :
-          originalQuery(parameters)
-      );
-    });
-
-    // Set realistic user agent
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-
-    // Set realistic viewport
-    await page.setViewport({ width: 1920, height: 1080 });
-
-    // Set comprehensive headers
-    await page.setExtraHTTPHeaders({
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Accept-Encoding': 'gzip, deflate, br',
-      'DNT': '1',
-      'Connection': 'keep-alive',
-      'Upgrade-Insecure-Requests': '1',
-      'Sec-Fetch-Dest': 'document',
-      'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': 'none',
-      'Sec-Fetch-User': '?1',
-      'Cache-Control': 'max-age=0'
-    });
 
     let product: ScrapedProduct | null = null;
 
-    // Scrape based on store
+    // Scrape based on store using ScraperAPI only
     switch (store) {
       case 'amazon':
-        // Use ScraperAPI only
-        console.log('Using ScraperAPI...');
+        console.log('Using ScraperAPI for Amazon...');
         product = await scrapeAmazonWithScraperAPI(url);
-        await browser.close();
         break;
       case 'walmart':
-        product = await scrapeWalmart(page, url);
-        await browser.close();
-        break;
+        console.log('Walmart scraping not yet implemented with ScraperAPI');
+        return NextResponse.json(
+          { success: false, error: 'Walmart scraping temporarily unavailable. Please use Amazon or eBay links.' },
+          { status: 501 }
+        );
       case 'ebay':
-        product = await scrapeEbay(page, url);
-        await browser.close();
-        break;
+        console.log('eBay scraping not yet implemented with ScraperAPI');
+        return NextResponse.json(
+          { success: false, error: 'eBay scraping temporarily unavailable. Please use Amazon links.' },
+          { status: 501 }
+        );
     }
 
     if (!product) {
