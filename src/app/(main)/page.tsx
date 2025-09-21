@@ -25,13 +25,92 @@ import { ERROR_MESSAGES } from '@/lib/error-messages';
 import { formatBdtPrice } from '@/lib/currency';
 import Image from 'next/image';
 
-// Mock data for live activity
-const recentOrders = [
-  { name: 'Ahmed', country: '🇧🇩 Bangladesh', product: 'iPhone 15 Pro', time: '2 min ago' },
-  { name: 'Priya', country: '🇮🇳 India', product: 'MacBook Air M3', time: '5 min ago' },
-  { name: 'Fatima', country: '🇵🇰 Pakistan', product: 'Samsung Galaxy S24', time: '8 min ago' },
-  { name: 'Ravi', country: '🇱🇰 Sri Lanka', product: 'Sony WH-1000XM5', time: '12 min ago' },
+// Dynamic live activity data pools
+const customerNames = [
+  'Ahmed', 'Priya', 'Fatima', 'Ravi', 'Sarah', 'Mohammed', 'Aisha', 'Raj', 'Maria', 'Hassan',
+  'Deepika', 'Omar', 'Zara', 'Arjun', 'Noor', 'Ali', 'Ananya', 'Tariq', 'Kavya', 'Imran',
+  'Sofia', 'Yusuf', 'Meera', 'Bilal', 'Rina', 'Karim', 'Lila', 'Saeed', 'Diya', 'Rashid'
 ];
+
+const countries = [
+  { name: 'Bangladesh', flag: '🇧🇩' },
+  { name: 'India', flag: '🇮🇳' },
+  { name: 'Pakistan', flag: '🇵🇰' },
+  { name: 'Sri Lanka', flag: '🇱🇰' },
+  { name: 'Nepal', flag: '🇳🇵' },
+  { name: 'Singapore', flag: '🇸🇬' },
+  { name: 'Malaysia', flag: '🇲🇾' },
+  { name: 'Thailand', flag: '🇹🇭' },
+  { name: 'UAE', flag: '🇦🇪' },
+  { name: 'Qatar', flag: '🇶🇦' },
+  { name: 'Kuwait', flag: '🇰🇼' },
+  { name: 'Saudi Arabia', flag: '🇸🇦' }
+];
+
+const popularProducts = [
+  'iPhone 15 Pro', 'MacBook Air M3', 'Samsung Galaxy S24', 'Sony WH-1000XM5', 'iPad Pro',
+  'AirPods Pro 2', 'Dell XPS 13', 'Canon EOS R6', 'Nintendo Switch OLED', 'PS5',
+  'Apple Watch Series 9', 'Surface Pro 9', 'Bose QuietComfort', 'Instant Pot Duo',
+  'Dyson V15 Detect', 'KitchenAid Mixer', 'Fitbit Charge 5', 'Echo Dot 5th Gen',
+  'Ring Video Doorbell', 'Roku Ultra', 'GoPro Hero 12', 'Kindle Paperwhite',
+  'JBL Flip 6', 'Samsung Galaxy Buds', 'Apple Magic Keyboard', 'Logitech MX Master 3'
+];
+
+interface LiveOrder {
+  id: string;
+  name: string;
+  country: string;
+  product: string;
+  timestamp: number;
+  timeOffset: number; // Minutes to add to the timestamp for display
+  isNew?: boolean;
+}
+
+// Track used combinations to avoid duplicates
+let usedCombinations = new Set<string>();
+
+const generateRandomOrder = (): LiveOrder => {
+  let randomName, randomCountry, randomProduct, combinationKey;
+
+  // Keep trying until we get a unique combination
+  do {
+    randomName = customerNames[Math.floor(Math.random() * customerNames.length)];
+    randomCountry = countries[Math.floor(Math.random() * countries.length)];
+    randomProduct = popularProducts[Math.floor(Math.random() * popularProducts.length)];
+    combinationKey = `${randomName}-${randomCountry.name}-${randomProduct}`;
+  } while (usedCombinations.has(combinationKey));
+
+  // Add to used combinations
+  usedCombinations.add(combinationKey);
+
+  // Clear the set if it gets too large (after 50+ combinations)
+  if (usedCombinations.size > 50) {
+    usedCombinations.clear();
+  }
+
+  const randomOffset = Math.floor(Math.random() * 20); // 0-20 minutes offset
+
+  return {
+    id: Math.random().toString(36).substr(2, 9),
+    name: randomName,
+    country: `${randomCountry.flag} ${randomCountry.name}`,
+    product: randomProduct,
+    timestamp: Date.now(),
+    timeOffset: randomOffset,
+    isNew: true
+  };
+};
+
+const getTimeAgo = (timestamp: number, offset: number): string => {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000) + (offset * 60);
+
+  if (seconds < 60) return 'just now';
+  if (seconds < 120) return '1 min ago';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 7200) return '1 hour ago';
+  return `${Math.floor(seconds / 3600)} hours ago`;
+};
+
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,16 +119,75 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [showUnsupportedMessage, setShowUnsupportedMessage] = useState(false);
-  const [currentOrderIndex, setCurrentOrderIndex] = useState(0);
+  const [liveOrders, setLiveOrders] = useState<LiveOrder[]>([]);
   const { addToCart } = useCart();
 
-  // Rotate through recent orders
+  // State for current highlighted order
+  const [currentOrderIndex, setCurrentOrderIndex] = useState(0);
+
+  // Initialize with some orders and generate new ones dynamically
+  useEffect(() => {
+    // Clear combinations on page load
+    usedCombinations.clear();
+
+    // Start with a few initial orders with different timestamps (newest first)
+    const now = Date.now();
+    const initialOrders = [];
+
+    // Generate orders from newest to oldest
+    for (let i = 0; i < 4; i++) {
+      const order = generateRandomOrder();
+      initialOrders.push({
+        ...order,
+        timestamp: now - (i * 120000) - (order.timeOffset * 60000), // Each order 2 minutes apart + offset
+        isNew: false
+      });
+    }
+
+    // Sort by timestamp descending (newest first)
+    initialOrders.sort((a, b) => b.timestamp - a.timestamp);
+    setLiveOrders(initialOrders);
+
+    // Generate new orders at random intervals
+    const generateNewOrder = () => {
+      const newOrder = generateRandomOrder();
+      setLiveOrders(prev => {
+        const updated = [newOrder, ...prev.slice(0, 3)]; // Keep only 4 most recent
+        // Sort by timestamp descending (newest first)
+        return updated.sort((a, b) => (b.timestamp + b.timeOffset * 60000) - (a.timestamp + a.timeOffset * 60000));
+      });
+      setCurrentOrderIndex(0); // Highlight the new order
+    };
+
+    // Generate new orders every 0-2 minutes (random intervals)
+    const scheduleNextOrder = () => {
+      const delay = Math.random() * 120000; // 0 to 2 minutes
+      setTimeout(() => {
+        generateNewOrder();
+        scheduleNextOrder();
+      }, delay);
+    };
+
+    scheduleNextOrder();
+  }, []);
+
+  // Rotate highlighting between orders
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentOrderIndex((prev) => (prev + 1) % recentOrders.length);
-    }, 4000);
+      setCurrentOrderIndex(prev => (prev + 1) % liveOrders.length);
+    }, 3000); // Highlight each order for 3 seconds
+
+    return () => clearInterval(interval);
+  }, [liveOrders.length]);
+
+  // Update timestamps every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLiveOrders(prev => [...prev]); // Force re-render to update times
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
+
 
   // Function to detect if input is a URL
   const isUrl = (string: string): boolean => {
@@ -454,9 +592,9 @@ export default function Home() {
                   Live Order Activity
                 </h3>
                 <div className="space-y-3">
-                  {recentOrders.map((order, index) => (
+                  {liveOrders.map((order, index) => (
                     <div
-                      key={index}
+                      key={order.id}
                       className={`flex items-center gap-3 bg-white/10 backdrop-blur rounded-lg p-3 transition-all duration-500 ${
                         index === currentOrderIndex ? 'scale-105 bg-white/20' : 'opacity-70'
                       }`}
@@ -465,7 +603,7 @@ export default function Home() {
                       <span className="flex-1">
                         <strong>{order.name}</strong> from {order.country} ordered {order.product}
                       </span>
-                      <span className="text-blue-200 text-sm">{order.time}</span>
+                      <span className="text-blue-200 text-sm">{getTimeAgo(order.timestamp, order.timeOffset)}</span>
                     </div>
                   ))}
                 </div>
