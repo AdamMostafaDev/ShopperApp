@@ -33,19 +33,19 @@ export async function GET() {
 
     // Get orders by tracking status
     const pendingPayment = await prisma.order.count({
-      where: { paymentConfirmationStatus: 'PENDING' }
+      where: { paymentStatus: 'PENDING' }
     });
 
     const pendingShipment = await prisma.order.count({
       where: {
-        paymentConfirmationStatus: 'COMPLETE',
-        shippedStatus: 'PENDING'
+        paymentStatus: 'PAID',
+        shippedToBdStatus: 'PENDING'
       }
     });
 
     const inTransit = await prisma.order.count({
       where: {
-        shippedStatus: 'PROCESSING',
+        shippedToBdStatus: 'PROCESSING',
         deliveredStatus: 'PENDING'
       }
     });

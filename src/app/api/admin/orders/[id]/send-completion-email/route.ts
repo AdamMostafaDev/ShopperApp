@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sendPriceConfirmationEmail } from '@/lib/klaviyo';
+import { sendPaymentConfirmationEmail } from '@/lib/klaviyo';
 import { getDisplayAmounts } from '@/lib/display-utils';
 
 export async function POST(
@@ -18,16 +18,17 @@ export async function POST(
       );
     }
 
-    // Fetch the order with user information
+    console.log(`📧 Sending payment completion email for order ${orderId}`);
+
+    // Get order details
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
         user: {
           select: {
-            email: true,
             firstName: true,
             lastName: true,
-            phone: true
+            email: true
           }
         }
       }
@@ -40,6 +41,14 @@ export async function POST(
       );
     }
 
+    // Check if payment is actually completed
+    if (order.paymentStatus !== 'PAID') {
+      return NextResponse.json(
+        { success: false, error: 'Order payment is not completed' },
+        { status: 400 }
+      );
+    }
+
     // Get display amounts using the same logic as the frontend
     const amounts = getDisplayAmounts(order);
 
@@ -48,7 +57,6 @@ export async function POST(
       ? `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim()
       : 'Customer';
     const customerEmail = order.user?.email || order.customerEmail;
-    const customerPhone = order.user?.phone || order.customerPhone;
 
     // Prepare items data
     const items = Array.isArray(order.items) ? order.items.map((item: any) => ({
@@ -62,15 +70,16 @@ export async function POST(
       originalPriceValue: item.product?.originalPriceValue || item.originalPriceValue || 0
     })) : [];
 
-    // Prepare payment confirmation data
-    const paymentConfirmationData = {
+    // Send payment confirmation email
+    const emailResult = await sendPaymentConfirmationEmail({
       orderId: order.id.toString(),
       orderNumber: order.orderNumber,
       customerEmail,
       customerName,
-      customerPhone,
+      customerPhone: order.customerPhone,
       shippingAddress: order.shippingAddress,
       items,
+      stripePaymentIntentId: order.stripePaymentIntentId,
 
       // Use display amounts which handle final pricing logic
       productCostBdt: amounts.productCostBdt,
@@ -92,76 +101,27 @@ export async function POST(
       exchangeRate: order.exchangeRate || 121.5,
       currency: order.currency || 'USD',
       orderDate: order.createdAt.toISOString()
-    };
-
-    // Check current payment status to determine email type and action
-    const currentPaymentStatus = order.paymentStatus;
-    let emailSubject = '';
-    let statusUpdateMessage = '';
-    let shouldUpdateStatus = false;
-
-    if (currentPaymentStatus === 'PENDING') {
-      emailSubject = 'Price Confirmation Request';
-      shouldUpdateStatus = true;
-      statusUpdateMessage = 'Status will be updated to PROCESSING';
-    } else if (currentPaymentStatus === 'PROCESSING') {
-      emailSubject = 'Payment Processing Update';
-      shouldUpdateStatus = false;
-      statusUpdateMessage = 'Payment is being processed';
-    } else {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `No update available for payment status: ${currentPaymentStatus}`
-        },
-        { status: 400 }
-      );
-    }
-
-    console.log('🔍 Sending price confirmation for order:', orderId);
-    console.log('📧 Email will be sent to:', customerEmail);
-    console.log('📋 Current payment status:', currentPaymentStatus);
-    console.log('📝 Email type:', emailSubject);
-    console.log('💰 Order total BDT:', amounts.totalAmountBdt);
-    console.log('📦 Shipping breakdown:', {
-      finalShippingOnlyBdt: amounts.finalShippingOnlyBdt,
-      finalAdditionalFeesBdt: amounts.finalAdditionalFeesBdt,
-      feeDescription: amounts.feeDescription
     });
 
-    // Send the price confirmation email via Klaviyo
-    const result = await sendPriceConfirmationEmail(paymentConfirmationData);
-
-    if (result.success) {
-      // Only update payment status to PROCESSING if it's currently PENDING
-      if (shouldUpdateStatus && currentPaymentStatus === 'PENDING') {
-        await prisma.order.update({
-          where: { id: orderId },
-          data: { paymentStatus: 'PROCESSING' }
-        });
-        console.log('✅ Updated payment status from PENDING to PROCESSING');
-      }
-
-      console.log('✅ Price confirmation email sent successfully for order:', orderId);
-      console.log('📝', statusUpdateMessage);
+    if (emailResult.success) {
+      console.log('✅ Payment confirmation email sent successfully');
 
       return NextResponse.json({
         success: true,
-        message: `${emailSubject} sent successfully. ${statusUpdateMessage}`,
-        eventId: result.eventId,
-        previousStatus: currentPaymentStatus,
-        newStatus: shouldUpdateStatus ? 'PROCESSING' : currentPaymentStatus
+        message: 'Payment confirmation email sent successfully',
+        orderId: order.id
       });
     } else {
-      console.error('❌ Failed to send payment confirmation email:', result.error);
-      return NextResponse.json(
-        { success: false, error: result.error },
-        { status: 500 }
-      );
+      console.error('❌ Failed to send payment confirmation email:', emailResult.error);
+
+      return NextResponse.json({
+        success: false,
+        error: emailResult.error || 'Failed to send email'
+      }, { status: 500 });
     }
 
   } catch (error) {
-    console.error('Error in send-confirmation-email API:', error);
+    console.error('Payment confirmation email error:', error);
     return NextResponse.json(
       {
         success: false,
@@ -169,5 +129,7 @@ export async function POST(
       },
       { status: 500 }
     );
+  } finally {
+    await prisma.$disconnect();
   }
 }

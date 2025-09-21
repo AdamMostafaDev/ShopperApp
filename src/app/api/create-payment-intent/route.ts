@@ -191,9 +191,9 @@ export async function POST(request: NextRequest) {
 
         // Order tracking statuses with defaults
         orderPlacedStatus: 'COMPLETE',
-        paymentConfirmationStatus: 'PROCESSING',
-        shippedStatus: 'PENDING',
-        outForDeliveryStatus: 'PENDING',
+        shippedToUsStatus: 'PENDING',
+        shippedToBdStatus: 'PENDING',
+        domesticFulfillmentStatus: 'PENDING',
         deliveredStatus: 'PENDING'
       }
     });

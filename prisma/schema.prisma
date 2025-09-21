@@ -129,9 +129,16 @@ model Order {
   userId                    Int               @map("user_id")
   deliveredStatus           TrackingStatus    @default(PENDING) @map("delivered_status")
   orderPlacedStatus         TrackingStatus    @default(COMPLETE) @map("order_placed_status")
-  outForDeliveryStatus      TrackingStatus    @default(PENDING) @map("out_for_delivery_status")
-  paymentConfirmationStatus TrackingStatus    @default(PROCESSING) @map("payment_confirmation_status")
-  shippedStatus             TrackingStatus    @default(PENDING) @map("shipped_status")
+  domesticFulfillmentStatus TrackingStatus    @default(PENDING) @map("domestic_fulfillment_status")
+  shippedToUsStatus         TrackingStatus    @default(PENDING) @map("shipped_to_us_status")
+  shippedToBdStatus         TrackingStatus    @default(PENDING) @map("shipped_to_bd_status")
+
+  // Domestic fulfillment choice fields
+  fulfillmentChoice         String?           // "PICKUP" | "DELIVERY" | null
+  fulfillmentChoiceDate     DateTime?         @map("fulfillment_choice_date")
+  pickupDetails             Json?             @map("pickup_details")
+  deliveryDetails           Json?             @map("delivery_details")
+
   user                      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("orders")
@@ -279,6 +286,10 @@ enum TrackingStatus {
   PENDING
   PROCESSING
   COMPLETE
+  PICKUP
+  DELIVERY
+  PICKUP_COMPLETE
+  DELIVERY_COMPLETE
 }
 
 enum AdminRole {

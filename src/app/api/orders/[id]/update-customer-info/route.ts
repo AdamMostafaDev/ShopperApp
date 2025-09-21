@@ -46,7 +46,6 @@ export async function POST(
         customerPhone: customerPhone,
         paymentStatus: 'PENDING', // Payment is pending confirmation
         orderPlacedStatus: 'COMPLETE', // Order is placed
-        paymentConfirmationStatus: 'PENDING', // Payment confirmation happens later
       },
     });
 

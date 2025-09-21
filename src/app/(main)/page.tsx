@@ -447,7 +447,8 @@ export default function Home() {
           <div className="flex justify-center">
             <button 
               onClick={() => {
-                document.querySelector('input[type="text"]')?.focus();
+                const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                input?.focus();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               className="bg-white text-blue-600 px-12 py-4 rounded-xl text-lg font-semibold hover:bg-gray-100 transition-colors shadow-lg"

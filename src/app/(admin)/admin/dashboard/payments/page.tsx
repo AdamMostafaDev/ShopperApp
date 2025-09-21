@@ -17,7 +17,6 @@ interface Payment {
     formattedUsd: string;
   };
   paymentStatus: string;
-  paymentConfirmationStatus: string;
   stripePaymentIntentId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -320,9 +319,9 @@ export default function PaymentTrackingPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      {getStatusIcon(payment.paymentConfirmationStatus)}
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getConfirmationStatusColor(payment.paymentConfirmationStatus)}`}>
-                        {payment.paymentConfirmationStatus}
+                      {getStatusIcon(payment.paymentStatus)}
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getConfirmationStatusColor(payment.paymentStatus)}`}>
+                        {payment.paymentStatus}
                       </span>
                     </div>
                   </td>

@@ -11,7 +11,8 @@ import {
   ClockIcon,
   XCircleIcon,
   XMarkIcon,
-  ShoppingBagIcon
+  ShoppingBagIcon,
+  EnvelopeIcon
 } from '@heroicons/react/24/outline';
 import { displayShipping, displayAmount, getDisplayAmounts, getUpdatedItemPrices } from '@/lib/display-utils';
 
@@ -42,8 +43,9 @@ interface Order {
   workflow: {
     orderPlaced: string;
     paymentConfirmation: string;
-    shipped: string;
-    outForDelivery: string;
+    shippedToUs: string;
+    shippedToBd: string;
+    domesticFulfillment: string;
     delivered: string;
   };
   amounts: {
@@ -123,6 +125,20 @@ export default function AdminOrdersPage() {
   const [savingPricing, setSavingPricing] = useState<Set<number>>(new Set());
   const [shippingExpanded, setShippingExpanded] = useState<Set<number>>(new Set());
   const [sendingEmail, setSendingEmail] = useState<Set<number>>(new Set());
+  const [sendingUSFacilityEmail, setSendingUSFacilityEmail] = useState<Set<number>>(new Set());
+  const [sendingInternationalShippingEmail, setSendingInternationalShippingEmail] = useState<Set<number>>(new Set());
+  const [sendingBDWarehouseEmail, setSendingBDWarehouseEmail] = useState<Set<number>>(new Set());
+  const [sendingChoiceEmail, setSendingChoiceEmail] = useState<Set<number>>(new Set());
+  const [sendingPickupEmail, setSendingPickupEmail] = useState<Set<number>>(new Set());
+  const [sendingDeliveryEmail, setSendingDeliveryEmail] = useState<Set<number>>(new Set());
+  const [sendingFinalPickupEmail, setSendingFinalPickupEmail] = useState<Set<number>>(new Set());
+  const [sendingFinalDeliveryEmail, setSendingFinalDeliveryEmail] = useState<Set<number>>(new Set());
+  const [updatingStatus, setUpdatingStatus] = useState<Set<number>>(new Set());
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<{[orderId: number]: string}>({});
+  const [selectedShippedToUsStatus, setSelectedShippedToUsStatus] = useState<{[orderId: number]: string}>({});
+  const [selectedShippedToBdStatus, setSelectedShippedToBdStatus] = useState<{[orderId: number]: string}>({});
+  const [selectedDomesticFulfillmentStatus, setSelectedDomesticFulfillmentStatus] = useState<{[orderId: number]: string}>({});
+  const [selectedDeliveredStatus, setSelectedDeliveredStatus] = useState<{[orderId: number]: string}>({});
   const [pagination, setPagination] = useState({
     total: 0,
     totalPages: 0,
@@ -145,6 +161,25 @@ export default function AdminOrdersPage() {
         const data: OrdersResponse = await response.json();
         setOrders(data.data.orders);
         setPagination(data.data.pagination);
+
+        // Initialize selected payment and shipping statuses for each order
+        const initialPaymentStatuses: {[key: number]: string} = {};
+        const initialShippingToUsStatuses: {[key: number]: string} = {};
+        const initialShippingToBdStatuses: {[key: number]: string} = {};
+        const initialDomesticFulfillmentStatuses: {[key: number]: string} = {};
+        const initialDeliveredStatuses: {[key: number]: string} = {};
+        data.data.orders.forEach(order => {
+          initialPaymentStatuses[order.id] = order.paymentStatus;
+          initialShippingToUsStatuses[order.id] = order.workflow.shippedToUs;
+          initialShippingToBdStatuses[order.id] = order.workflow.shippedToBd;
+          initialDomesticFulfillmentStatuses[order.id] = order.workflow.domesticFulfillment;
+          initialDeliveredStatuses[order.id] = order.workflow.delivered;
+        });
+        setSelectedPaymentStatus(initialPaymentStatuses);
+        setSelectedShippedToUsStatus(initialShippingToUsStatuses);
+        setSelectedShippedToBdStatus(initialShippingToBdStatuses);
+        setSelectedDomesticFulfillmentStatus(initialDomesticFulfillmentStatuses);
+        setSelectedDeliveredStatus(initialDeliveredStatuses);
       }
     } catch (error) {
       console.error('Failed to fetch orders:', error);
@@ -198,12 +233,36 @@ export default function AdminOrdersPage() {
         // Show success feedback for longer duration
         console.log('✅ Email sent successfully for order:', orderId, 'Event ID:', result.eventId);
 
+        // Update local state instead of refreshing entire page
+        if (result.previousStatus === 'PENDING' && result.newStatus === 'PROCESSING') {
+          setOrders(prevOrders =>
+            prevOrders.map(order =>
+              order.id === orderId
+                ? { ...order, paymentStatus: 'PROCESSING', workflow: { ...order.workflow, paymentConfirmation: 'PROCESSING' } }
+                : order
+            )
+          );
+          setSelectedPaymentStatus(prev => ({...prev, [orderId]: 'PROCESSING'}));
+        }
+
+        // Auto-update shipping status if payment was confirmed to PAID
+        if (result.newStatus === 'PAID') {
+          setOrders(prevOrders =>
+            prevOrders.map(order =>
+              order.id === orderId
+                ? { ...order, workflow: { ...order.workflow, shippedToUs: 'PROCESSING' } }
+                : order
+            )
+          );
+          setSelectedShippedToUsStatus(prev => ({...prev, [orderId]: 'PROCESSING'}));
+        }
+
         // Use a better notification system instead of alert
         const notification = document.createElement('div');
         notification.innerHTML = `
           <div style="position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
-            ✅ Payment confirmation email sent successfully!
-            <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Order: ${orderId} | Event ID: ${result.eventId || 'N/A'}</div>
+            ✅ ${result.message || 'Email sent successfully!'}
+            <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Order: ${orderId} | ${result.previousStatus === 'PENDING' ? 'Status updated to PROCESSING' : ''}</div>
           </div>
         `;
         document.body.appendChild(notification);
@@ -262,6 +321,1033 @@ export default function AdminOrdersPage() {
     }
   };
 
+  // Smart Email Action - Handles different email types based on payment status
+  const handleSmartEmailAction = async (orderId: number, paymentStatus: string) => {
+    console.log(`🎯 Smart email action for order ${orderId}, status: ${paymentStatus}`);
+
+    if (paymentStatus === 'PENDING') {
+      // Send confirmation email AND update status to PROCESSING
+      console.log('📧 PENDING → Sending confirmation email + updating to PROCESSING');
+
+      // First send the email
+      await handleSendConfirmationEmail(orderId);
+
+      // Then update status to PROCESSING (only if email was successful)
+      // The email function already handles status update for PENDING orders
+
+    } else if (paymentStatus === 'PROCESSING') {
+      // Send processing update email (existing functionality)
+      console.log('📧 PROCESSING → Sending processing update email');
+      await handleSendConfirmationEmail(orderId);
+
+    } else if (paymentStatus === 'PAID') {
+      // Send payment completion confirmation email (new functionality)
+      console.log('📧 PAID → Sending payment completion confirmation email');
+
+      // Mark as sending email
+      setSendingEmail(prev => new Set([...prev, orderId]));
+
+      try {
+        const response = await fetch(`/api/admin/orders/${orderId}/send-completion-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          console.log('✅ Payment completion email sent successfully');
+
+          // Show success notification
+          const notification = document.createElement('div');
+          notification.innerHTML = `
+            <div style="position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+              ✅ Payment completion email sent successfully!
+              <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Order: ${orderId}</div>
+            </div>
+          `;
+          document.body.appendChild(notification);
+
+          setTimeout(() => {
+            if (notification.parentNode) {
+              notification.parentNode.removeChild(notification);
+            }
+          }, 4000);
+
+        } else {
+          console.error('❌ Failed to send completion email:', result.error);
+
+          // Show error notification
+          const notification = document.createElement('div');
+          notification.innerHTML = `
+            <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+              ❌ Failed to send completion email: ${result.error}
+            </div>
+          `;
+          document.body.appendChild(notification);
+
+          setTimeout(() => {
+            if (notification.parentNode) {
+              notification.parentNode.removeChild(notification);
+            }
+          }, 6000);
+        }
+      } catch (error) {
+        console.error('Error sending completion email:', error);
+
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ❌ Failed to send completion email. Please try again.
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 6000);
+      } finally {
+        // Clear sending state
+        setSendingEmail(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(orderId);
+          return newSet;
+        });
+      }
+    } else if (paymentStatus === 'REFUNDED') {
+      // Send refund notification email
+      console.log('📧 REFUNDED → Sending refund notification email');
+
+      // Mark as sending email
+      setSendingEmail(prev => new Set([...prev, orderId]));
+
+      try {
+        const response = await fetch(`/api/admin/orders/${orderId}/send-refund-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          console.log('✅ Refund notification email sent successfully');
+
+          // Show success notification
+          const notification = document.createElement('div');
+          notification.innerHTML = `
+            <div style="position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+              ✅ Refund notification email sent successfully!
+              <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Order: ${orderId}</div>
+            </div>
+          `;
+          document.body.appendChild(notification);
+
+          setTimeout(() => {
+            if (notification.parentNode) {
+              notification.parentNode.removeChild(notification);
+            }
+          }, 4000);
+
+        } else {
+          console.error('❌ Failed to send refund email:', result.error);
+
+          // Show error notification
+          const notification = document.createElement('div');
+          notification.innerHTML = `
+            <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+              ❌ Failed to send refund email: ${result.error}
+            </div>
+          `;
+          document.body.appendChild(notification);
+
+          setTimeout(() => {
+            if (notification.parentNode) {
+              notification.parentNode.removeChild(notification);
+            }
+          }, 6000);
+        }
+      } catch (error) {
+        console.error('Error sending refund email:', error);
+
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ❌ Failed to send refund email. Please try again.
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 6000);
+      } finally {
+        // Clear sending state
+        setSendingEmail(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(orderId);
+          return newSet;
+        });
+      }
+    }
+  };
+
+  // Handle US Facility Email Action
+  const handleUSFacilityEmailAction = async (orderId: number) => {
+    console.log(`📦 Sending US facility arrival confirmation email for order ${orderId}`);
+
+    // Mark as sending US facility email
+    setSendingUSFacilityEmail(prev => new Set([...prev, orderId]));
+
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}/send-us-facility-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ US facility arrival email sent successfully');
+
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ✅ US facility arrival email sent successfully!
+            <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Order: ${orderId}</div>
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 4000);
+
+      } else {
+        console.error('❌ Failed to send US facility email:', result.error);
+
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ❌ Failed to send US facility email: ${result.error}
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 6000);
+      }
+    } catch (error) {
+      console.error('Error sending US facility email:', error);
+
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.innerHTML = `
+        <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+          ❌ Failed to send US facility email. Please try again.
+        </div>
+      `;
+      document.body.appendChild(notification);
+
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 6000);
+    } finally {
+      // Clear sending state
+      setSendingUSFacilityEmail(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
+  // Handle International Shipping Email Action
+  const handleInternationalShippingEmailAction = async (orderId: number) => {
+    console.log(`✈️ Sending international shipping confirmation email for order ${orderId}`);
+
+    // Mark as sending international shipping email
+    setSendingInternationalShippingEmail(prev => new Set([...prev, orderId]));
+
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}/send-international-shipping-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ International shipping email sent successfully');
+
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ✅ International shipping email sent successfully!
+            <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Order: ${orderId}</div>
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 4000);
+
+      } else {
+        console.error('❌ Failed to send international shipping email:', result.error);
+
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ❌ Failed to send international shipping email: ${result.error}
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 6000);
+      }
+    } catch (error) {
+      console.error('Error sending international shipping email:', error);
+
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.innerHTML = `
+        <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+          ❌ Failed to send international shipping email. Please try again.
+        </div>
+      `;
+      document.body.appendChild(notification);
+
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 6000);
+    } finally {
+      // Clear sending state
+      setSendingInternationalShippingEmail(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
+  // Handle BD Warehouse Email Action
+  const handleBDWarehouseEmailAction = async (orderId: number) => {
+    console.log(`🏢 Sending BD warehouse arrival confirmation email for order ${orderId}`);
+
+    // Mark as sending BD warehouse email
+    setSendingBDWarehouseEmail(prev => new Set([...prev, orderId]));
+
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}/send-bd-warehouse-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ BD warehouse arrival email sent successfully');
+
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ✅ BD warehouse arrival email sent successfully!
+            <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Order: ${orderId}</div>
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 4000);
+
+      } else {
+        console.error('❌ Failed to send BD warehouse email:', result.error);
+
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ❌ Failed to send BD warehouse email: ${result.error}
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 6000);
+      }
+    } catch (error) {
+      console.error('Error sending BD warehouse email:', error);
+
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.innerHTML = `
+        <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+          ❌ Failed to send BD warehouse email. Please try again.
+        </div>
+      `;
+      document.body.appendChild(notification);
+
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 6000);
+    } finally {
+      // Clear sending state
+      setSendingBDWarehouseEmail(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
+  // Handle Domestic Fulfillment Email Actions
+  const handleCustomerChoiceEmailAction = async (orderId: number) => {
+    console.log(`📋 Sending customer choice email for order ${orderId}`);
+
+    setSendingChoiceEmail(prev => new Set([...prev, orderId]));
+
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}/send-choice-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ Customer choice email sent successfully');
+
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ✅ Customer choice email sent successfully!
+            <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Order: ${orderId}</div>
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 4000);
+
+      } else {
+        console.error('❌ Failed to send choice email:', result.error);
+
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ❌ Failed to send choice email: ${result.error}
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 6000);
+      }
+    } catch (error) {
+      console.error('Error sending choice email:', error);
+
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.innerHTML = `
+        <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+          ❌ Failed to send choice email. Please try again.
+        </div>
+      `;
+      document.body.appendChild(notification);
+
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 6000);
+    } finally {
+      setSendingChoiceEmail(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
+  const handlePickupEmailAction = async (orderId: number) => {
+    console.log(`🏪 Sending pickup confirmation email for order ${orderId}`);
+
+    setSendingPickupEmail(prev => new Set([...prev, orderId]));
+
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}/send-pickup-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ Pickup confirmation email sent successfully');
+
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ✅ Pickup confirmation email sent successfully!
+            <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Order: ${orderId}</div>
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 4000);
+
+      } else {
+        console.error('❌ Failed to send pickup email:', result.error);
+
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ❌ Failed to send pickup email: ${result.error}
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 6000);
+      }
+    } catch (error) {
+      console.error('Error sending pickup email:', error);
+
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.innerHTML = `
+        <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+          ❌ Failed to send pickup email. Please try again.
+        </div>
+      `;
+      document.body.appendChild(notification);
+
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 6000);
+    } finally {
+      setSendingPickupEmail(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleDeliveryEmailAction = async (orderId: number) => {
+    console.log(`🚚 Sending delivery confirmation email for order ${orderId}`);
+
+    setSendingDeliveryEmail(prev => new Set([...prev, orderId]));
+
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}/send-delivery-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ Delivery confirmation email sent successfully');
+
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ✅ Delivery confirmation email sent successfully!
+            <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Order: ${orderId}</div>
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 4000);
+
+      } else {
+        console.error('❌ Failed to send delivery email:', result.error);
+
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ❌ Failed to send delivery email: ${result.error}
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 6000);
+      }
+    } catch (error) {
+      console.error('Error sending delivery email:', error);
+
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.innerHTML = `
+        <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+          ❌ Failed to send delivery email. Please try again.
+        </div>
+      `;
+      document.body.appendChild(notification);
+
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 6000);
+    } finally {
+      setSendingDeliveryEmail(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleFinalPickupEmailAction = async (orderId: number) => {
+    console.log(`✅ Sending final pickup confirmation email for order ${orderId}`);
+
+    setSendingFinalPickupEmail(prev => new Set([...prev, orderId]));
+
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}/send-final-pickup-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      let result;
+      try {
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        result = await response.json();
+      } catch (e) {
+        if (e.message.startsWith('HTTP')) {
+          throw e; // Re-throw HTTP errors
+        }
+        // This is a JSON parsing error
+        throw new Error(`Failed to parse response as JSON: ${e.message}`);
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send final pickup confirmation email');
+      }
+
+      console.log(`✅ Final pickup confirmation email sent successfully for order ${orderId}`);
+
+      // Show success notification
+      const notification = document.createElement('div');
+      notification.innerHTML = `
+        <div style="position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="font-size: 18px;">✅</div>
+            <div>Final pickup confirmation email sent successfully!</div>
+          </div>
+          <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Order: ${orderId} | Review request sent to customer</div>
+        </div>
+      `;
+      document.body.appendChild(notification);
+
+      // Auto-remove notification after 6 seconds
+      setTimeout(() => {
+        if (document.body.contains(notification)) {
+          document.body.removeChild(notification);
+        }
+      }, 6000);
+
+    } catch (error) {
+      console.error('Error sending final pickup confirmation email:', error);
+
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.innerHTML = `
+        <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="font-size: 18px;">❌</div>
+            <div>Failed to send final pickup confirmation email</div>
+          </div>
+          <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">${error instanceof Error ? error.message : 'Unknown error'}</div>
+        </div>
+      `;
+      document.body.appendChild(notification);
+
+      // Auto-remove notification after 6 seconds
+      setTimeout(() => {
+        if (document.body.contains(notification)) {
+          document.body.removeChild(notification);
+        }
+      }, 6000);
+    } finally {
+      setSendingFinalPickupEmail(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleFinalDeliveryEmailAction = async (orderId: number) => {
+    console.log(`✅ Sending final delivery confirmation email for order ${orderId}`);
+
+    setSendingFinalDeliveryEmail(prev => new Set([...prev, orderId]));
+
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}/send-final-delivery-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      let result;
+      try {
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        result = await response.json();
+      } catch (e) {
+        if (e.message.startsWith('HTTP')) {
+          throw e; // Re-throw HTTP errors
+        }
+        // This is a JSON parsing error
+        throw new Error(`Failed to parse response as JSON: ${e.message}`);
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send final delivery confirmation email');
+      }
+
+      console.log(`✅ Final delivery confirmation email sent successfully for order ${orderId}`);
+
+      // Show success notification
+      const notification = document.createElement('div');
+      notification.innerHTML = `
+        <div style="position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="font-size: 18px;">✅</div>
+            <div>Final delivery confirmation email sent successfully!</div>
+          </div>
+          <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Order: ${orderId} | Review request sent to customer</div>
+        </div>
+      `;
+      document.body.appendChild(notification);
+
+      // Auto-remove notification after 6 seconds
+      setTimeout(() => {
+        if (document.body.contains(notification)) {
+          document.body.removeChild(notification);
+        }
+      }, 6000);
+
+    } catch (error) {
+      console.error('Error sending final delivery confirmation email:', error);
+
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.innerHTML = `
+        <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="font-size: 18px;">❌</div>
+            <div>Failed to send final delivery confirmation email</div>
+          </div>
+          <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">${error instanceof Error ? error.message : 'Unknown error'}</div>
+        </div>
+      `;
+      document.body.appendChild(notification);
+
+      // Auto-remove notification after 6 seconds
+      setTimeout(() => {
+        if (document.body.contains(notification)) {
+          document.body.removeChild(notification);
+        }
+      }, 6000);
+    } finally {
+      setSendingFinalDeliveryEmail(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleStatusChange = async (orderId: number, statusType: 'paymentStatus' | 'shippedToUsStatus' | 'shippedToBdStatus' | 'domesticFulfillmentStatus' | 'deliveredStatus', value: string) => {
+    setUpdatingStatus(prev => new Set([...prev, orderId]));
+
+    // Update the local state immediately for better UX
+    if (statusType === 'paymentStatus') {
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.id === orderId
+            ? {
+                ...order,
+                paymentStatus: value,
+                workflow: {
+                  ...order.workflow,
+                  paymentConfirmation: value,
+                  // Auto-update US shipping when payment confirmed
+                  shippedToUs: value === 'PAID' ? 'PROCESSING' : order.workflow.shippedToUs
+                }
+              }
+            : order
+        )
+      );
+
+      // Also update the selected shipping status state if payment becomes PAID
+      if (value === 'PAID') {
+        setSelectedShippedToUsStatus(prev => ({...prev, [orderId]: 'PROCESSING'}));
+      }
+    } else if (statusType === 'shippedToUsStatus') {
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.id === orderId
+            ? { ...order, workflow: { ...order.workflow, shippedToUs: value } }
+            : order
+        )
+      );
+    } else if (statusType === 'shippedToBdStatus') {
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.id === orderId
+            ? {
+                ...order,
+                workflow: {
+                  ...order.workflow,
+                  shippedToBd: value,
+                  // Auto-update domestic fulfillment when BD warehouse complete
+                  domesticFulfillment: value === 'COMPLETE' ? 'PROCESSING' : order.workflow.domesticFulfillment
+                }
+              }
+            : order
+        )
+      );
+
+      // Also update the selected domestic fulfillment status if BD warehouse becomes COMPLETE
+      if (value === 'COMPLETE') {
+        setSelectedDomesticFulfillmentStatus(prev => ({...prev, [orderId]: 'PROCESSING'}));
+      }
+    } else if (statusType === 'domesticFulfillmentStatus') {
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.id === orderId
+            ? { ...order, workflow: { ...order.workflow, domesticFulfillment: value } }
+            : order
+        )
+      );
+    } else if (statusType === 'deliveredStatus') {
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.id === orderId
+            ? { ...order, workflow: { ...order.workflow, delivered: value } }
+            : order
+        )
+      );
+    }
+
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ statusType, value })
+      });
+
+      if (response.ok) {
+        const updatedOrder = await response.json();
+
+        // Update just this specific order in the state
+        if (statusType === 'paymentStatus') {
+          setOrders(prevOrders =>
+            prevOrders.map(order =>
+              order.id === orderId
+                ? {
+                    ...order,
+                    paymentStatus: value,
+                    workflow: {
+                      ...order.workflow,
+                      paymentConfirmation: value,
+                      // Auto-update US shipping when payment confirmed
+                      shippedToUs: value === 'PAID' ? 'PROCESSING' : order.workflow.shippedToUs
+                    }
+                  }
+                : order
+            )
+          );
+
+          // Also update the selected shipping status state if payment becomes PAID
+          if (value === 'PAID') {
+            setSelectedShippedToUsStatus(prev => ({...prev, [orderId]: 'PROCESSING'}));
+          }
+        } else if (statusType === 'shippedToUsStatus') {
+          setOrders(prevOrders =>
+            prevOrders.map(order =>
+              order.id === orderId
+                ? { ...order, workflow: { ...order.workflow, shippedToUs: value } }
+                : order
+            )
+          );
+        } else if (statusType === 'shippedToBdStatus') {
+          setOrders(prevOrders =>
+            prevOrders.map(order =>
+              order.id === orderId
+                ? {
+                    ...order,
+                    workflow: {
+                      ...order.workflow,
+                      shippedToBd: value,
+                      // Auto-update domestic fulfillment when BD warehouse complete
+                      domesticFulfillment: value === 'COMPLETE' ? 'PROCESSING' : order.workflow.domesticFulfillment
+                    }
+                  }
+                : order
+            )
+          );
+
+          // Also update the selected domestic fulfillment status if BD warehouse becomes COMPLETE
+          if (value === 'COMPLETE') {
+            setSelectedDomesticFulfillmentStatus(prev => ({...prev, [orderId]: 'PROCESSING'}));
+          }
+        } else if (statusType === 'domesticFulfillmentStatus') {
+          setOrders(prevOrders =>
+            prevOrders.map(order =>
+              order.id === orderId
+                ? { ...order, workflow: { ...order.workflow, domesticFulfillment: value } }
+                : order
+            )
+          );
+        } else if (statusType === 'deliveredStatus') {
+          setOrders(prevOrders =>
+            prevOrders.map(order =>
+              order.id === orderId
+                ? { ...order, workflow: { ...order.workflow, delivered: value } }
+                : order
+            )
+          );
+        }
+
+        console.log(`✅ Updated ${statusType} to ${value} for order ${orderId}`);
+
+        // Show success notification
+        const notification = document.createElement('div');
+        const autoShippingMessage = (statusType === 'paymentStatus' && value === 'PAID')
+          ? '<div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">🚚 US shipping status auto-updated to PROCESSING</div>'
+          : (statusType === 'shippedToBdStatus' && value === 'COMPLETE')
+          ? '<div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">📦 Domestic fulfillment auto-updated to PROCESSING</div>'
+          : '';
+
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ✅ Status updated successfully!
+            ${autoShippingMessage}
+          </div>
+        `;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+      } else {
+        // Revert the optimistic update if the request failed
+        fetchOrders();
+        console.error('❌ Failed to update status');
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500;">
+            ❌ Failed to update status
+          </div>
+        `;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+      }
+    } catch (error) {
+      // Revert the optimistic update on error
+      fetchOrders();
+      console.error('Error updating status:', error);
+    } finally {
+      setUpdatingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'DELIVERED': return 'bg-green-100 text-green-800 border-green-200';
@@ -270,7 +1356,13 @@ export default function AdminOrdersPage() {
       case 'PENDING': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'CANCELLED': return 'bg-red-100 text-red-800 border-red-200';
       case 'COMPLETE': return 'bg-green-100 text-green-800 border-green-200';
+      case 'PICKUP': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'DELIVERY': return 'bg-cyan-100 text-cyan-800 border-cyan-200';
+      case 'PICKUP_COMPLETE': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'DELIVERY_COMPLETE': return 'bg-teal-100 text-teal-800 border-teal-200';
+      case 'PAID': return 'bg-green-100 text-green-800 border-green-200';
       case 'FAILED': return 'bg-red-100 text-red-800 border-red-200';
+      case 'REFUNDED': return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'SUCCEEDED': return 'bg-green-100 text-green-800 border-green-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -281,6 +1373,7 @@ export default function AdminOrdersPage() {
       case 'COMPLETE':
       case 'SUCCEEDED':
       case 'DELIVERED':
+      case 'PAID':
         return <CheckCircleIcon className="h-4 w-4" />;
       case 'PENDING':
       case 'PROCESSING':
@@ -290,6 +1383,8 @@ export default function AdminOrdersPage() {
         return <XCircleIcon className="h-4 w-4" />;
       case 'SHIPPED':
         return <TruckIcon className="h-4 w-4" />;
+      case 'REFUNDED':
+        return <XCircleIcon className="h-4 w-4" />;
       default:
         return <ClockIcon className="h-4 w-4" />;
     }
@@ -412,73 +1507,383 @@ export default function AdminOrdersPage() {
                 <div className="p-6 border-b">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4">Complete Status Information</h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Order Statuses */}
-                    <div className="space-y-3">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Column 1: Order Statuses */}
+                    <div className="lg:col-span-3 space-y-3">
                       <h4 className="text-xs font-medium text-gray-700 uppercase tracking-wide">Order Statuses</h4>
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Order Status:</span>
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full ${getStatusColor(order.status)}`}>
+                        <div className="flex flex-col space-y-1">
+                          <span className="text-xs text-gray-500">Order Status:</span>
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full ${getStatusColor(order.status)} w-fit`}>
                             {getStatusIcon(order.status)}
                             {order.status}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Fulfillment:</span>
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full ${getStatusColor(order.fulfillmentStatus)}`}>
+                        <div className="flex flex-col space-y-1">
+                          <span className="text-xs text-gray-500">Fulfillment:</span>
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full ${getStatusColor(order.fulfillmentStatus)} w-fit`}>
                             {order.fulfillmentStatus}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Payment:</span>
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full ${getStatusColor(order.paymentStatus)}`}>
-                            <CreditCardIcon className="h-3 w-3" />
-                            {order.paymentStatus}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Workflow Statuses */}
-                    <div className="space-y-3">
+                    {/* Column 2: International Shipping Workflow */}
+                    <div className="lg:col-span-6 space-y-3">
                       <h4 className="text-xs font-medium text-gray-700 uppercase tracking-wide">International Shipping Workflow</h4>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Order Placed:</span>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm text-gray-600 min-w-[180px]">Order Placed:</span>
                           <span className={`inline-flex px-2 py-1 text-xs rounded-full ${getStatusColor(order.workflow.orderPlaced)}`}>
                             {order.workflow.orderPlaced}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Payment Confirmation:</span>
-                          <span className={`inline-flex px-2 py-1 text-xs rounded-full ${getStatusColor(order.workflow.paymentConfirmation)}`}>
-                            {order.workflow.paymentConfirmation}
-                          </span>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm text-gray-600 min-w-[180px]">Payment:</span>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={selectedPaymentStatus[order.id] || order.paymentStatus}
+                              onChange={(e) => {
+                                const newStatus = e.target.value;
+                                setSelectedPaymentStatus(prev => ({...prev, [order.id]: newStatus}));
+                                handleStatusChange(order.id, 'paymentStatus', newStatus);
+                              }}
+                              disabled={updatingStatus.has(order.id)}
+                              className={`text-xs font-semibold rounded px-2 py-1 border ${getStatusColor(selectedPaymentStatus[order.id] || order.paymentStatus)} cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${updatingStatus.has(order.id) ? 'opacity-50' : ''} relative w-40`}
+                            >
+                              <option value="PENDING">PENDING</option>
+                              <option value="PROCESSING">PROCESSING</option>
+                              <option value="PAID">PAID</option>
+                              <option value="FAILED">FAILED</option>
+                              <option value="REFUNDED">REFUNDED</option>
+                            </select>
+                            {/* Smart Email Button - Updates based on selected status */}
+                            {(() => {
+                              const currentStatus = selectedPaymentStatus[order.id] || order.paymentStatus;
+                              return (currentStatus === 'PENDING' || currentStatus === 'PAID' || currentStatus === 'REFUNDED') && (
+                                <button
+                                  onClick={() => handleSmartEmailAction(order.id, currentStatus)}
+                                  disabled={sendingEmail.has(order.id)}
+                                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                  title={
+                                    currentStatus === 'PENDING'
+                                      ? 'Send price confirmation email and auto-update status to PROCESSING'
+                                      : currentStatus === 'PAID'
+                                      ? 'Send payment confirmation email to customer'
+                                      : 'Send refund notification email to customer'
+                                  }
+                                >
+                                  {sendingEmail.has(order.id) ? (
+                                    <>
+                                      <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                      <span>Sending...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <EnvelopeIcon className="h-3 w-3" />
+                                      <span>
+                                        {currentStatus === 'PENDING'
+                                          ? 'Send Price Confirmation'
+                                          : currentStatus === 'PAID'
+                                          ? 'Send Payment Confirmation'
+                                          : 'Send Refund Notification'}
+                                      </span>
+                                    </>
+                                  )}
+                                </button>
+                              );
+                            })()}
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Shipped to BD:</span>
-                          <span className={`inline-flex px-2 py-1 text-xs rounded-full ${getStatusColor(order.workflow.shipped)}`}>
-                            {order.workflow.shipped}
-                          </span>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm text-gray-600 min-w-[180px]">Shipped to US Facility:</span>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={selectedShippedToUsStatus[order.id] || order.workflow.shippedToUs}
+                              onChange={(e) => {
+                                const newStatus = e.target.value;
+                                setSelectedShippedToUsStatus(prev => ({...prev, [order.id]: newStatus}));
+                                handleStatusChange(order.id, 'shippedToUsStatus', newStatus);
+                              }}
+                              disabled={updatingStatus.has(order.id)}
+                              className={`text-xs font-semibold rounded px-2 py-1 border ${getStatusColor(selectedShippedToUsStatus[order.id] || order.workflow.shippedToUs)} cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${updatingStatus.has(order.id) ? 'opacity-50' : ''} relative w-40`}
+                            >
+                              <option value="PENDING">PENDING</option>
+                              <option value="PROCESSING">PROCESSING</option>
+                              <option value="COMPLETE">COMPLETE</option>
+                            </select>
+                            {/* Smart Email Button for US Facility */}
+                            {(() => {
+                              const currentStatus = selectedShippedToUsStatus[order.id] || order.workflow.shippedToUs;
+                              return currentStatus === 'COMPLETE' && (
+                                <button
+                                  onClick={() => handleUSFacilityEmailAction(order.id)}
+                                  disabled={sendingUSFacilityEmail.has(order.id)}
+                                  className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                  title="Send US facility arrival confirmation email to customer"
+                                >
+                                  {sendingUSFacilityEmail.has(order.id) ? (
+                                    <>
+                                      <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                      <span>Sending...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <EnvelopeIcon className="h-3 w-3" />
+                                      <span>Send US Arrival Confirmation</span>
+                                    </>
+                                  )}
+                                </button>
+                              );
+                            })()}
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Out for Delivery:</span>
-                          <span className={`inline-flex px-2 py-1 text-xs rounded-full ${getStatusColor(order.workflow.outForDelivery)}`}>
-                            {order.workflow.outForDelivery}
-                          </span>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm text-gray-600 min-w-[180px]">Shipped Internationally:</span>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={selectedShippedToBdStatus[order.id] || order.workflow.shippedToBd}
+                              onChange={(e) => {
+                                const newStatus = e.target.value;
+                                setSelectedShippedToBdStatus(prev => ({...prev, [order.id]: newStatus}));
+                                handleStatusChange(order.id, 'shippedToBdStatus', newStatus);
+                              }}
+                              disabled={updatingStatus.has(order.id)}
+                              className={`text-xs font-semibold rounded px-2 py-1 border ${getStatusColor(selectedShippedToBdStatus[order.id] || order.workflow.shippedToBd)} cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${updatingStatus.has(order.id) ? 'opacity-50' : ''} relative w-40`}
+                            >
+                              <option value="PENDING">PENDING</option>
+                              <option value="PROCESSING">PROCESSING</option>
+                              <option value="COMPLETE">COMPLETE</option>
+                            </select>
+                            {/* Smart Email Button for International Shipping */}
+                            {(() => {
+                              const currentStatus = selectedShippedToBdStatus[order.id] || order.workflow.shippedToBd;
+                              return (currentStatus === 'PROCESSING' || currentStatus === 'COMPLETE') && (
+                                <button
+                                  onClick={() => {
+                                    if (currentStatus === 'PROCESSING') {
+                                      handleInternationalShippingEmailAction(order.id);
+                                    } else if (currentStatus === 'COMPLETE') {
+                                      handleBDWarehouseEmailAction(order.id);
+                                    }
+                                  }}
+                                  disabled={sendingInternationalShippingEmail.has(order.id) || sendingBDWarehouseEmail.has(order.id)}
+                                  className={`px-3 py-1 text-sm ${currentStatus === 'PROCESSING' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-orange-600 hover:bg-orange-700'} text-white rounded transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1`}
+                                  title={
+                                    currentStatus === 'PROCESSING'
+                                      ? 'Send international shipping confirmation email to customer'
+                                      : 'Send BD warehouse arrival confirmation email to customer'
+                                  }
+                                >
+                                  {(sendingInternationalShippingEmail.has(order.id) || sendingBDWarehouseEmail.has(order.id)) ? (
+                                    <>
+                                      <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                      <span>Sending...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <EnvelopeIcon className="h-3 w-3" />
+                                      <span>
+                                        {currentStatus === 'PROCESSING'
+                                          ? 'Send Shipping Confirmation'
+                                          : 'Send BD Arrival Confirmation'}
+                                      </span>
+                                    </>
+                                  )}
+                                </button>
+                              );
+                            })()}
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Delivered:</span>
-                          <span className={`inline-flex px-2 py-1 text-xs rounded-full ${getStatusColor(order.workflow.delivered)}`}>
-                            {order.workflow.delivered}
-                          </span>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm text-gray-600 min-w-[180px]">Domestic Fulfillment:</span>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={selectedDomesticFulfillmentStatus[order.id] || order.workflow.domesticFulfillment}
+                              onChange={(e) => {
+                                const newStatus = e.target.value;
+                                setSelectedDomesticFulfillmentStatus(prev => ({...prev, [order.id]: newStatus}));
+                                handleStatusChange(order.id, 'domesticFulfillmentStatus', newStatus);
+                              }}
+                              disabled={updatingStatus.has(order.id)}
+                              className={`text-xs font-semibold rounded px-2 py-1 border ${getStatusColor(selectedDomesticFulfillmentStatus[order.id] || order.workflow.domesticFulfillment)} cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${updatingStatus.has(order.id) ? 'opacity-50' : ''} relative w-40`}
+                            >
+                              <option value="PENDING">PENDING</option>
+                              <option value="PROCESSING">PROCESSING</option>
+                              <option value="PICKUP">PICKUP</option>
+                              <option value="DELIVERY">DELIVERY</option>
+                            </select>
+                            {/* Smart Email Buttons for Domestic Fulfillment */}
+                            {(() => {
+                              const currentStatus = selectedDomesticFulfillmentStatus[order.id] || order.workflow.domesticFulfillment;
+                              if (currentStatus === 'PROCESSING') {
+                                return (
+                                  <button
+                                    onClick={() => handleCustomerChoiceEmailAction(order.id)}
+                                    disabled={sendingChoiceEmail.has(order.id)}
+                                    className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                    title="Send customer choice email (pickup or delivery)"
+                                  >
+                                    {sendingChoiceEmail.has(order.id) ? (
+                                      <>
+                                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Sending...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <EnvelopeIcon className="h-3 w-3" />
+                                        <span>Send Delivery Options</span>
+                                      </>
+                                    )}
+                                  </button>
+                                );
+                              } else if (currentStatus === 'PICKUP') {
+                                return (
+                                  <button
+                                    onClick={() => handlePickupEmailAction(order.id)}
+                                    disabled={sendingPickupEmail.has(order.id)}
+                                    className="px-3 py-1 text-sm bg-yellow-600 text-white rounded hover:bg-yellow-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                    title="Send pickup confirmation email to customer"
+                                  >
+                                    {sendingPickupEmail.has(order.id) ? (
+                                      <>
+                                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Sending...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <EnvelopeIcon className="h-3 w-3" />
+                                        <span>Send Pickup Confirmation</span>
+                                      </>
+                                    )}
+                                  </button>
+                                );
+                              } else if (currentStatus === 'DELIVERY') {
+                                return (
+                                  <button
+                                    onClick={() => handleDeliveryEmailAction(order.id)}
+                                    disabled={sendingDeliveryEmail.has(order.id)}
+                                    className="px-3 py-1 text-sm bg-cyan-600 text-white rounded hover:bg-cyan-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                    title="Send delivery confirmation email to customer"
+                                  >
+                                    {sendingDeliveryEmail.has(order.id) ? (
+                                      <>
+                                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Sending...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <EnvelopeIcon className="h-3 w-3" />
+                                        <span>Send Delivery Confirmation</span>
+                                      </>
+                                    )}
+                                  </button>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm text-gray-600 min-w-[180px]">Delivered:</span>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={selectedDeliveredStatus[order.id] || order.workflow.delivered}
+                              onChange={(e) => {
+                                const newStatus = e.target.value;
+                                setSelectedDeliveredStatus(prev => ({...prev, [order.id]: newStatus}));
+                                handleStatusChange(order.id, 'deliveredStatus', newStatus);
+                              }}
+                              disabled={updatingStatus.has(order.id)}
+                              className={`text-xs font-semibold rounded px-2 py-1 border ${getStatusColor(selectedDeliveredStatus[order.id] || order.workflow.delivered)} cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${updatingStatus.has(order.id) ? 'opacity-50' : ''} relative w-40`}
+                            >
+                              <option value="PENDING">PENDING</option>
+                              <option value="PROCESSING">PROCESSING</option>
+                              <option value="PICKUP_COMPLETE">PICKUP COMPLETE</option>
+                              <option value="DELIVERY_COMPLETE">DELIVERY COMPLETE</option>
+                            </select>
+                            {/* Final Pickup Confirmation Button - Now inline with more space */}
+                            {(() => {
+                              const currentDeliveredStatus = selectedDeliveredStatus[order.id] || order.workflow.delivered;
+                              if (currentDeliveredStatus === 'PICKUP_COMPLETE') {
+                                return (
+                                  <button
+                                    onClick={() => handleFinalPickupEmailAction(order.id)}
+                                    disabled={sendingFinalPickupEmail.has(order.id)}
+                                    className="px-3 py-1 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                    title="Send final pickup confirmation with review request"
+                                  >
+                                    {sendingFinalPickupEmail.has(order.id) ? (
+                                      <>
+                                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Sending...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <EnvelopeIcon className="h-3 w-3" />
+                                        <span>Send Final Pickup Confirmation</span>
+                                      </>
+                                    )}
+                                  </button>
+                                );
+                              }
+
+                              if (currentDeliveredStatus === 'DELIVERY_COMPLETE') {
+                                return (
+                                  <button
+                                    onClick={() => handleFinalDeliveryEmailAction(order.id)}
+                                    disabled={sendingFinalDeliveryEmail.has(order.id)}
+                                    className="px-3 py-1 text-sm bg-teal-600 text-white rounded hover:bg-teal-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                    title="Send final delivery confirmation with review request"
+                                  >
+                                    {sendingFinalDeliveryEmail.has(order.id) ? (
+                                      <>
+                                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Sending...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <EnvelopeIcon className="h-3 w-3" />
+                                        <span>Send Final Delivery Confirmation</span>
+                                      </>
+                                    )}
+                                  </button>
+                                );
+                              }
+
+                              return null;
+                            })()}
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Additional Info */}
-                    <div className="space-y-3">
+                    {/* Column 3: Additional Information */}
+                    <div className="lg:col-span-3 space-y-3">
                       <h4 className="text-xs font-medium text-gray-700 uppercase tracking-wide">Additional Information</h4>
                       <div className="space-y-2">
                         <div>
@@ -653,7 +2058,7 @@ export default function AdminOrdersPage() {
                                   ...editedPricing,
                                   [order.id]: { ...edited, exchangeRate: parseFloat(e.target.value) || 0 }
                                 })}
-                                className="w-32 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                className="w-40 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
                             </label>
                           </div>
@@ -1060,24 +2465,6 @@ export default function AdminOrdersPage() {
                   </div>
                 )}
 
-                {/* Action Buttons */}
-                <div className="p-6 border-t bg-white">
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => handleSendConfirmationEmail(order.id)}
-                      disabled={sendingEmail.has(order.id)}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {sendingEmail.has(order.id) && (
-                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      )}
-                      {sendingEmail.has(order.id) ? 'Sending Email...' : 'Send Confirmation Email'}
-                    </button>
-                  </div>
-                </div>
               </div>
             )}
           </div>

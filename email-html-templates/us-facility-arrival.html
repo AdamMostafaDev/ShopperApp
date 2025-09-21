@@ -1,0 +1,348 @@
+  <!--[if mso]>
+      <noscript>
+          <xml>
+              <o:OfficeDocumentSettings>
+                  <o:PixelsPerInch>96</o:PixelsPerInch>
+              </o:OfficeDocumentSettings>
+          </xml>
+      </noscript>
+      <![endif]-->
+    <style>
+        /* Reset styles */
+        body,
+        table,
+        td,
+        a {
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
+
+        table,
+        td {
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }
+
+        img {
+            -ms-interpolation-mode: bicubic;
+            border: 0;
+            outline: none;
+            text-decoration: none;
+        }
+
+        /* Mobile styles */
+        @media screen and (max-width: 600px) {
+            .mobile-padding {
+                padding: 20px !important;
+            }
+
+            .mobile-center {
+                text-align: center !important;
+            }
+
+            .container {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            .mobile-button {
+                width: 100% !important;
+                margin: 10px 0 !important;
+            }
+
+            .mobile-hide {
+                display: none !important;
+            }
+
+            .product-image {
+                width: 80px !important;
+                height: 80px !important;
+            }
+
+            .timeline-icon {
+                width: 40px !important;
+                height: 40px !important;
+            }
+        }
+    </style>
+
+
+
+
+    <!-- Email Container -->
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+
+                <!-- Main Content Container -->
+                <table class="container" border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+                    <!-- Header -->
+                    <tr>
+                        <td align="center" style="padding: 40px 20px; background-color: #2c3e50; border-radius: 8px 8px 0 0;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold; text-align: center;">
+                                UniShopper</h1>
+                        </td>
+                    </tr>
+
+                    <!-- Success Icon and Message -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 40px 40px 20px 40px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <!-- Facility Icon -->
+                                        <div style="width: 80px; height: 80px; margin: 0 auto 20px; background-color: #3498db; border-radius: 50%; display: inline-block;">
+                                            <div style="color: white; font-size: 36px; line-height: 80px; text-align: center;">
+                                                🏢</div>
+                                        </div>
+                                        <h2 style="color: #3498db; margin: 0 0 10px 0; font-size: 28px; text-align: center;">
+                                            Items Arrived at US Facility!</h2>
+                                        <p style="color: #2c3e50; margin: 0 0 10px 0; font-size: 18px; font-weight: bold; text-align: center;">
+                                            Great news, {{ event.customer_name }}!</p>
+                                        <p style="color: #7f8c8d; margin: 0 0 20px 0; font-size: 16px; text-align: center; line-height: 1.6;">
+                                            Your items have successfully arrived at our US consolidation facility and are
+                                            now being processed for international shipping to Bangladesh.</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Order Summary -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8f9fa; border-radius: 8px; padding: 20px;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">Order Summary
+                                        </h3>
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td style="padding: 8px 0; color: #7f8c8d;">Order Number:</td>
+                                                <td align="right" style="padding: 8px 0; color: #2c3e50; font-weight: bold; font-size: 16px;">
+                                                    {{ event.order_number }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0; color: #7f8c8d;">Facility Arrival:</td>
+                                                <td align="right" style="padding: 8px 0; color: #2c3e50;">{{
+                                                    event.email_sent_date }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0; color: #7f8c8d;">Items Count:</td>
+                                                <td align="right" style="padding: 8px 0; color: #2c3e50;">{{
+                                                    event.item_count }}</td>
+                                            </tr>
+                                            <tr style="border-top: 2px solid #dee2e6;">
+                                                <td style="padding: 12px 0 8px 0; color: #2c3e50; font-weight: bold; font-size: 18px;">
+                                                    Order Total:</td>
+                                                <td align="right" style="padding: 12px 0 8px 0; color: #3498db; font-weight: bold; font-size: 20px;">
+                                                    {{ event.formatted_total_bdt }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td></td>
+                                                <td align="right" style="color: #7f8c8d; font-size: 14px;">{{
+                                                    event.formatted_total_bdt }}</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- What's Next Section -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px;">
+                            <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; text-align: center;">What
+                                Happens Next?</h3>
+
+                            <!-- Timeline -->
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px;">
+                                <!-- Step 1 - Completed -->
+                                <tr>
+                                    <td width="60" valign="top">
+                                        <div class="timeline-icon" style="width: 50px; height: 50px; background-color: #27ae60; border-radius: 50%; display: inline-block;">
+                                            <div style="color: white; font-size: 24px; line-height: 50px; text-align: center;">
+                                                ✓</div>
+                                        </div>
+                                    </td>
+                                    <td valign="top" style="padding-left: 20px; padding-bottom: 30px;">
+                                        <h4 style="color: #27ae60; margin: 0 0 5px 0; font-size: 16px;">Arrived at US
+                                            Facility</h4>
+                                        <p style="color: #7f8c8d; margin: 0; font-size: 14px; line-height: 1.5;">Your
+                                            items have been delivered from suppliers to our US warehouse</p>
+                                    </td>
+                                </tr>
+
+                                <!-- Step 2 - In Progress -->
+                                <tr>
+                                    <td width="60" valign="top">
+                                        <div class="timeline-icon" style="width: 50px; height: 50px; background-color: #3498db; border-radius: 50%; display: inline-block; animation: pulse 2s infinite;">
+                                            <div style="color: white; font-size: 24px; line-height: 50px; text-align: center;">
+                                                📦</div>
+                                        </div>
+                                    </td>
+                                    <td valign="top" style="padding-left: 20px; padding-bottom: 30px;">
+                                        <h4 style="color: #3498db; margin: 0 0 5px 0; font-size: 16px;">Quality Check &amp;
+                                            Consolidation</h4>
+                                        <p style="color: #7f8c8d; margin: 0; font-size: 14px; line-height: 1.5;">{{
+                                            event.next_step }} ({{ event.expected_shipping_timeline }})</p>
+                                    </td>
+                                </tr>
+
+                                <!-- Step 3 - Upcoming -->
+                                <tr>
+                                    <td width="60" valign="top">
+                                        <div class="timeline-icon" style="width: 50px; height: 50px; background-color: #ecf0f1; border-radius: 50%; display: inline-block;">
+                                            <div style="color: #95a5a6; font-size: 24px; line-height: 50px; text-align: center;">
+                                                ✈️</div>
+                                        </div>
+                                    </td>
+                                    <td valign="top" style="padding-left: 20px; padding-bottom: 30px;">
+                                        <h4 style="color: #7f8c8d; margin: 0 0 5px 0; font-size: 16px;">International
+                                            Shipping</h4>
+                                        <p style="color: #95a5a6; margin: 0; font-size: 14px; line-height: 1.5;">Your
+                                            package will be shipped to Bangladesh (15-20 days)</p>
+                                    </td>
+                                </tr>
+
+                                <!-- Step 4 - Final -->
+                                <tr>
+                                    <td width="60" valign="top">
+                                        <div class="timeline-icon" style="width: 50px; height: 50px; background-color: #ecf0f1; border-radius: 50%; display: inline-block;">
+                                            <div style="color: #95a5a6; font-size: 24px; line-height: 50px; text-align: center;">
+                                                🏠</div>
+                                        </div>
+                                    </td>
+                                    <td valign="top" style="padding-left: 20px;">
+                                        <h4 style="color: #7f8c8d; margin: 0 0 5px 0; font-size: 16px;">Local Delivery
+                                        </h4>
+                                        <p style="color: #95a5a6; margin: 0; font-size: 14px; line-height: 1.5;">Final
+                                            delivery to your address in Bangladesh</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Items Being Processed -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px;">
+                            <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px;">Items Being Processed</h3>
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                {% for item in event.items %}
+                                <tr>
+                                    <td style="padding: 15px; border: 1px solid #ecf0f1; border-radius: 8px; margin-bottom: 10px;">
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td width="100" valign="top">
+                                                    <img src="{{ item.product_image }}" alt="{{ item.product_name }}" class="product-image" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px;">
+                                                </td>
+                                                <td valign="top" style="padding-left: 20px;">
+                                                    <h4 style="color: #2c3e50; margin: 0 0 5px 0; font-size: 16px; line-height: 1.4;">
+                                                        {{ item.product_name }}</h4>
+                                                    <p style="color: #7f8c8d; margin: 0 0 5px 0; font-size: 14px;">
+                                                        Store: {{ item.store }}<br>
+                                                        Quantity: {{ item.quantity }}<br>
+                                                        Price: ৳{{ item.price_bdt }} per item
+                                                    </p>
+                                                    <p style="color: #3498db; margin: 0; font-size: 12px; font-weight: bold;">
+                                                        ✓ Received at facility
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                        </td>
+                    </tr>
+
+
+                    <!-- View Order Button -->
+                    <tr>
+                        <td align="center" class="mobile-padding" style="padding: 20px 40px;">
+                            <table border="0" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{{ event.order_details_url }}" style="display: inline-block; padding: 16px 32px; background-color: #3498db; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; min-width: 180px; text-align: center;">Track
+                                            Order Progress</a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Customer Information -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8f9fa; border-radius: 8px; padding: 20px;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">Delivery
+                                            Information</h3>
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td width="50%" valign="top" style="padding-right: 20px;">
+                                                    <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 14px;">
+                                                        Shipping Address</h4>
+                                                    <p style="color: #2c3e50; margin: 0; font-size: 14px; line-height: 1.6;">
+                                                        {{ event.customer_address|safe }}
+                                                    </p>
+                                                </td>
+                                                <td width="50%" valign="top" style="padding-left: 20px;">
+                                                    <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 14px;">
+                                                        Contact Details</h4>
+                                                    <p style="color: #2c3e50; margin: 0; font-size: 14px; line-height: 1.6;">
+                                                        Email: {{ event.customer_email }}<br>
+                                                        Phone: {{ event.customer_phone }}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding-bottom: 20px;">
+                                        <p style="color: #7f8c8d; margin: 0 0 10px 0; font-size: 14px;">
+                                            Thank you for choosing UniShopper for your international shopping needs!
+                                        </p>
+                                        <p style="color: #7f8c8d; margin: 0 0 10px 0; font-size: 14px;">
+                                            Questions about your order? We're here to help!
+                                        </p>
+                                        <a href="mailto:support@unishopper.com" style="color: #3498db; text-decoration: none; font-size: 14px; font-weight: bold;">Contact
+                                            Support</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding-top: 20px; border-top: 1px solid #dee2e6;">
+                                        <p style="color: #95a5a6; margin: 0; font-size: 12px;">
+                                            © 2024 UniShopper. All rights reserved.<br>
+                                            International Shopping Service - Dhaka, Bangladesh
+                                        </p>
+                                        <p style="color: #95a5a6; margin: 10px 0 0 0; font-size: 12px;">
+                                            <a href="{{ unsubscribe_link }}" style="color: #95a5a6; text-decoration: underline;">Unsubscribe</a> |
+                                            <a href="{{ manage_preferences_link }}" style="color: #95a5a6; text-decoration: underline;">Manage
+                                                Preferences</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                </table>
+
+            </td>
+        </tr>
+    </table>

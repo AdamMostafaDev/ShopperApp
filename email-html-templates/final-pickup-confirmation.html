@@ -1,0 +1,301 @@
+<!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+  <style>
+      /* Reset styles */
+      body,
+      table,
+      td,
+      a {
+          -webkit-text-size-adjust: 100%;
+          -ms-text-size-adjust: 100%;
+      }
+
+      table,
+      td {
+          mso-table-lspace: 0pt;
+          mso-table-rspace: 0pt;
+      }
+
+      img {
+          -ms-interpolation-mode: bicubic;
+          border: 0;
+          outline: none;
+          text-decoration: none;
+      }
+
+      /* Mobile styles */
+      @media screen and (max-width: 600px) {
+          .mobile-padding {
+              padding: 20px !important;
+          }
+
+          .mobile-center {
+              text-align: center !important;
+          }
+
+          .container {
+              width: 100% !important;
+              max-width: 100% !important;
+          }
+
+          .mobile-button {
+              width: 100% !important;
+              margin: 10px 0 !important;
+          }
+
+          .mobile-hide {
+              display: none !important;
+          }
+
+          .product-image {
+              width: 80px !important;
+              height: 80px !important;
+          }
+
+          .button-container {
+              display: block !important;
+          }
+
+          .button-cell {
+              display: block !important;
+              width: 100% !important;
+              padding: 5px 0 !important;
+          }
+
+          .timeline-icon {
+              width: 40px !important;
+              height: 40px !important;
+          }
+      }
+  </style>
+
+
+
+
+  <!-- Email Container -->
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4;">
+      <tr>
+          <td align="center" style="padding: 40px 0;">
+
+              <!-- Main Content Container -->
+              <table class="container" border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+                  <!-- Header -->
+                  <tr>
+                      <td align="center" style="padding: 40px 20px; background-color: #2c3e50; border-radius: 8px 8px 0 0;">
+                          <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold; text-align: center;">
+                              UniShopper</h1>
+                      </td>
+                  </tr>
+
+                  <!-- Success Icon and Message -->
+                  <tr>
+                      <td class="mobile-padding" style="padding: 40px 40px 20px 40px;">
+                          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                              <tr>
+                                  <td align="center">
+                                      <!-- Completion Icon -->
+                                      <div style="width: 80px; height: 80px; margin: 0 auto 20px; background-color: #27ae60; border-radius: 50%; display: inline-block;">
+                                          <div style="color: white; font-size: 40px; line-height: 80px; text-align: center;">✅</div>
+                                      </div>
+                                      <h2 style="color: #27ae60; margin: 0 0 10px 0; font-size: 28px; text-align: center;">
+                                          Pickup Complete!</h2>
+                                      <p style="color: #2c3e50; margin: 0 0 10px 0; font-size: 18px; font-weight: bold; text-align: center;">
+                                          Hi {{ event.customer_name }}!</p>
+                                      <p style="color: #7f8c8d; margin: 0 0 20px 0; font-size: 16px; text-align: center; line-height: 1.6;">
+                                          {{ event.review_request_message }}</p>
+                                  </td>
+                              </tr>
+                          </table>
+                      </td>
+                  </tr>
+
+                  <!-- Order Summary -->
+                  <tr>
+                      <td class="mobile-padding" style="padding: 20px 40px;">
+                          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8f9fa; border-radius: 8px; padding: 20px;">
+                              <tr>
+                                  <td style="padding: 20px;">
+                                      <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">Order Summary</h3>
+                                      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                          <tr>
+                                              <td style="padding: 8px 0; color: #7f8c8d;">Order Number:</td>
+                                              <td align="right" style="padding: 8px 0; color: #2c3e50; font-weight: bold; font-size: 16px;">{{ event.order_number }}</td>
+                                          </tr>
+                                          <tr>
+                                              <td style="padding: 8px 0; color: #7f8c8d;">Order Date:</td>
+                                              <td align="right" style="padding: 8px 0; color: #2c3e50;">{{ event.formatted_order_date }}</td>
+                                          </tr>
+                                          <tr>
+                                              <td style="padding: 8px 0; color: #7f8c8d;">Pickup Date:</td>
+                                              <td align="right" style="padding: 8px 0; color: #27ae60; font-weight: bold;">{{ event.pickup_completion_date }}</td>
+                                          </tr>
+                                          <tr>
+                                              <td style="padding: 8px 0; color: #7f8c8d;">Status:</td>
+                                              <td align="right" style="padding: 8px 0; color: #27ae60; font-weight: bold;">✅ Completed</td>
+                                          </tr>
+                                      </table>
+                                  </td>
+                              </tr>
+                          </table>
+                      </td>
+                  </tr>
+
+                  <!-- Package Contents -->
+                  <tr>
+                      <td class="mobile-padding" style="padding: 20px 40px;">
+                          <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px;">Your Products</h3>
+                          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                              {% for item in event.items %}
+                              <tr>
+                                  <td style="padding: 15px; border: 1px solid #ecf0f1; border-radius: 8px; margin-bottom: 10px;">
+                                      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                          <tr>
+                                              <td width="100" valign="top">
+                                                  <img src="{{ item.product_image }}" alt="{{ item.product_name }}" class="product-image" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px;">
+                                              </td>
+                                              <td valign="top" style="padding-left: 20px;">
+                                                  <h4 style="color: #2c3e50; margin: 0 0 5px 0; font-size: 16px;">{{ item.product_name }}</h4>
+                                                  <p style="color: #7f8c8d; margin: 0 0 5px 0; font-size: 14px;">
+                                                      Store: {{ item.store }}<br>
+                                                      Quantity: {{ item.quantity }}
+                                                  </p>
+                                              </td>
+                                          </tr>
+                                      </table>
+                                  </td>
+                              </tr>
+                              {% endfor %}
+                          </table>
+                      </td>
+                  </tr>
+
+                  <!-- Review Request Section -->
+                  <tr>
+                      <td class="mobile-padding" style="padding: 20px 40px;">
+                          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #fff3cd; border-radius: 8px; padding: 25px; border: 2px solid #ffc107;">
+                              <tr>
+                                  <td style="padding: 20px;">
+                                      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                          <tr>
+                                              <td width="60" valign="top">
+                                                  <div style="width: 50px; height: 50px; background-color: #ffc107; border-radius: 50%; display: inline-block;">
+                                                      <div style="color: white; font-size: 24px; line-height: 50px; text-align: center;">⭐</div>
+                                                  </div>
+                                              </td>
+                                              <td valign="top" style="padding-left: 20px;">
+                                                  <h4 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">Share Your Experience!</h4>
+                                                  <p style="color: #2c3e50; margin: 0 0 15px 0; font-size: 14px; line-height: 1.6;">
+                                                      How was your shopping experience with UniShopper? Your feedback helps us improve our service and helps other customers make informed decisions.
+                                                  </p>
+                                                  <p style="color: #7f8c8d; margin: 0; font-size: 14px;">
+                                                      📝 <strong>Quick Options:</strong><br>
+                                                      • Leave a detailed review on our website<br>
+                                                      • Take our 2-minute satisfaction survey<br>
+                                                      • Share photos of your products (optional)
+                                                  </p>
+                                              </td>
+                                          </tr>
+                                      </table>
+                                  </td>
+                              </tr>
+                          </table>
+                      </td>
+                  </tr>
+
+                  <!-- Action Buttons -->
+                  <tr>
+                      <td align="center" class="mobile-padding" style="padding: 20px 40px;">
+                          <table border="0" cellspacing="0" cellpadding="0" class="button-container" style="display: table;">
+                              <tr>
+                                  <td class="button-cell" style="display: table-cell; padding: 0 10px;">
+                                      <a href="{{ event.leave_review_url }}" style="display: inline-block; padding: 16px 24px; background-color: #e74c3c; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; min-width: 160px; text-align: center;">Leave a Review</a>
+                                  </td>
+                                  <td class="button-cell" style="display: table-cell; padding: 0 10px;">
+                                      <a href="{{ event.survey_url }}" style="display: inline-block; padding: 16px 24px; background-color: #3498db; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; min-width: 160px; text-align: center;">Take Survey</a>
+                                  </td>
+                              </tr>
+                          </table>
+                      </td>
+                  </tr>
+
+                  <!-- Secondary Action Button -->
+                  <tr>
+                      <td align="center" class="mobile-padding" style="padding: 0 40px 20px 40px;">
+                          <table border="0" cellspacing="0" cellpadding="0">
+                              <tr>
+                                  <td align="center">
+                                      <a href="{{ event.track_order_url }}" style="display: inline-block; padding: 12px 24px; background-color: #27ae60; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: bold; min-width: 180px; text-align: center;">View Order Details</a>
+                                  </td>
+                              </tr>
+                          </table>
+                      </td>
+                  </tr>
+
+                  <!-- Contact Information -->
+                  <tr>
+                      <td class="mobile-padding" style="padding: 20px 40px;">
+                          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8f9fa; border-radius: 8px; padding: 20px;">
+                              <tr>
+                                  <td style="padding: 20px; text-align: center;">
+                                      <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">Need Help?</h3>
+                                      <p style="color: #7f8c8d; margin: 0 0 10px 0; font-size: 14px; line-height: 1.6;">
+                                          If you have any issues with your products or need assistance, we're here to help!
+                                      </p>
+                                      <p style="color: #2c3e50; margin: 10px 0; font-size: 14px;">
+                                          📧 Email: <a href="mailto:support@unishopper.com" style="color: #3498db; text-decoration: none;">support@unishopper.com</a><br>
+                                          📞 Phone: {{ event.contact_phone }}<br>
+                                          💬 WhatsApp: {{ event.contact_phone }}
+                                      </p>
+                                      <p style="color: #7f8c8d; margin: 15px 0 0 0; font-size: 12px;">
+                                          <a href="{{ event.support_url }}" style="color: #3498db; text-decoration: none;">Visit Support Center</a>
+                                      </p>
+                                  </td>
+                              </tr>
+                          </table>
+                      </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                      <td style="padding: 30px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
+                          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                              <tr>
+                                  <td align="center" style="padding-bottom: 20px;">
+                                      <p style="color: #7f8c8d; margin: 0 0 10px 0; font-size: 14px;">
+                                          Thank you for choosing UniShopper for your international shopping needs!
+                                      </p>
+                                      <p style="color: #7f8c8d; margin: 0 0 10px 0; font-size: 14px;">
+                                          We hope you love your products and look forward to serving you again.
+                                      </p>
+                                      <a href="mailto:support@unishopper.com" style="color: #3498db; text-decoration: none; font-size: 14px; font-weight: bold;">Contact Support</a>
+                                  </td>
+                              </tr>
+                              <tr>
+                                  <td align="center" style="padding-top: 20px; border-top: 1px solid #dee2e6;">
+                                      <p style="color: #95a5a6; margin: 0; font-size: 12px;">
+                                          © 2024 UniShopper. All rights reserved.<br>
+                                          International Shopping Service - Dhaka, Bangladesh
+                                      </p>
+                                      <p style="color: #95a5a6; margin: 10px 0 0 0; font-size: 12px;">
+                                          <a href="{{ unsubscribe_link }}" style="color: #95a5a6; text-decoration: underline;">Unsubscribe</a> |
+                                          <a href="{{ manage_preferences_link }}" style="color: #95a5a6; text-decoration: underline;">Manage Preferences</a>
+                                      </p>
+                                  </td>
+                              </tr>
+                          </table>
+                      </td>
+                  </tr>
+
+              </table>
+
+          </td>
+      </tr>
+  </table>
