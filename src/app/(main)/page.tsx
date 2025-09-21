@@ -144,8 +144,8 @@ export default function Home() {
       });
     }
 
-    // Sort by timestamp descending (newest first)
-    initialOrders.sort((a, b) => b.timestamp - a.timestamp);
+    // Sort by effective timestamp descending (newest first)
+    initialOrders.sort((a, b) => (b.timestamp - b.timeOffset * 60000) - (a.timestamp - a.timeOffset * 60000));
     setLiveOrders(initialOrders);
 
     // Generate new orders at random intervals
@@ -153,15 +153,15 @@ export default function Home() {
       const newOrder = generateRandomOrder();
       setLiveOrders(prev => {
         const updated = [newOrder, ...prev.slice(0, 3)]; // Keep only 4 most recent
-        // Sort by timestamp descending (newest first)
-        return updated.sort((a, b) => (b.timestamp + b.timeOffset * 60000) - (a.timestamp + a.timeOffset * 60000));
+        // Sort by effective timestamp descending (newest first)
+        return updated.sort((a, b) => (b.timestamp - b.timeOffset * 60000) - (a.timestamp - a.timeOffset * 60000));
       });
       setCurrentOrderIndex(0); // Highlight the new order
     };
 
     // Generate new orders every 0-2 minutes (random intervals)
     const scheduleNextOrder = () => {
-      const delay = Math.random() * 120000; // 0 to 2 minutes
+      const delay = Math.random() * 300000; // 0 to 2 minutes
       setTimeout(() => {
         generateNewOrder();
         scheduleNextOrder();
