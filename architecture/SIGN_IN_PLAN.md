@@ -11,4 +11,5 @@
 - [ ] **1.3** TEST: Test with a number 
 - [ ] **1.4** Rate limit implementation
 
-18777804236
+## Phase 1.5 New users should be able to save addresses on checkout (wait until otp integration)
+- [ ] **1.1** New users right now have their default addrress as country and 
