@@ -40,6 +40,28 @@ export async function POST(
       );
     }
 
+    // Check if final pricing has been set by admin
+    if (!order.finalPricingUpdated) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Cannot send pricing confirmation email. Final pricing has not been set yet. Please update the shipping costs and any additional fees first.'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check that shipping cost is not 0 or null
+    if (!order.finalShippingCostBdt || order.finalShippingCostBdt === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Cannot send pricing confirmation email. Shipping cost has not been set. Please update the shipping cost first.'
+        },
+        { status: 400 }
+      );
+    }
+
     // Get display amounts using the same logic as the frontend
     const amounts = getDisplayAmounts(order);
 

@@ -63,12 +63,59 @@ export async function POST(request: NextRequest) {
     const orderCount = await prisma.order.count();
     const orderNumber = (100000 + orderCount).toString();
 
+    // Process cartItems to create smaller, optimized data for pooler compatibility
+    console.log('🔍 Processing cart items for order creation...');
+    console.log(`📦 Original cart items count: ${cartItems.length}`);
+
+    const processedItems = cartItems.map((item: any, index: number) => {
+      const originalImageUrl = item.product.image;
+      const isValidImage = originalImageUrl &&
+                          originalImageUrl.trim() !== '' &&
+                          (originalImageUrl.startsWith('http://') ||
+                           originalImageUrl.startsWith('https://') ||
+                           originalImageUrl.startsWith('//'));
+
+      const finalImageUrl = isValidImage
+        ? originalImageUrl.substring(0, 500) // Limit URL length for pooler
+        : 'https://via.placeholder.com/150x150.png?text=Product';
+
+      console.log(`📸 Item ${index + 1} - ${item.product.title}:`);
+      console.log(`   Original image: ${originalImageUrl ? originalImageUrl.substring(0, 100) + '...' : 'NO IMAGE'}`);
+      console.log(`   Valid: ${isValidImage ? '✅' : '❌'}`);
+      console.log(`   Final image: ${finalImageUrl.substring(0, 100)}...`);
+      console.log(`   Image length: ${finalImageUrl.length} chars`);
+
+      return {
+        quantity: item.quantity,
+        product: {
+          id: item.product.id,
+          title: item.product.title,
+          price: item.product.price,
+          store: item.product.store || 'Amazon',
+          url: item.product.url || '',
+          weight: item.product.weight || 0,
+          originalPriceValue: item.product.originalPriceValue || item.product.originalPrice || 0,
+          originalCurrency: item.product.originalCurrency || 'USD',
+          image: finalImageUrl
+        }
+      };
+    });
+
+    // Log JSON size for pooler compatibility analysis
+    const jsonSize = JSON.stringify(processedItems).length;
+    console.log(`📊 Processed items JSON size: ${jsonSize} characters`);
+    console.log(`🔗 Database connection: ${process.env.NODE_ENV === 'production' ? 'POOLER (production)' : 'DIRECT (development)'}`);
+
+    if (jsonSize > 50000) {
+      console.warn('⚠️  Large JSON detected - may cause pooler issues');
+    }
+
     // Create order in database first
     const order = await prisma.order.create({
       data: {
         orderNumber,
         userId: parseInt(session.user.id), // Convert string to int
-        items: cartItems,
+        items: processedItems,
         productCostBdt: totals.subtotal,
         serviceChargeBdt: totals.serviceCharge,
         shippingCostBdt: 0, // Set to 0, admin will update later
@@ -83,6 +130,20 @@ export async function POST(request: NextRequest) {
         paymentStatus: 'PENDING',
         fulfillmentStatus: 'PENDING'
       }
+    });
+
+    console.log(`✅ Order created successfully: ${order.orderNumber} (ID: ${order.id})`);
+
+    // Verify what was actually stored in the database
+    console.log('🔍 Verifying stored data...');
+    const storedItems = Array.isArray(order.items) ? order.items : [];
+    console.log(`📦 Items stored in database: ${storedItems.length}`);
+
+    storedItems.forEach((item: any, index: number) => {
+      const imageUrl = item.product?.image || item.image || 'NO IMAGE';
+      console.log(`📸 Stored Item ${index + 1}: ${item.product?.title || 'NO TITLE'}`);
+      console.log(`   Image URL: ${imageUrl.substring(0, 100)}${imageUrl.length > 100 ? '...' : ''}`);
+      console.log(`   Image length: ${imageUrl.length} chars`);
     });
 
     // Create line items for Stripe
@@ -173,7 +234,7 @@ export async function POST(request: NextRequest) {
           price: item.product.price,
           originalPriceValue: item.product.originalPrice || (item.product.price / 121.17), // fallback exchange rate
           quantity: item.quantity,
-          image: item.product.image || 'https://via.placeholder.com/100x100',
+          image: item.product.image && item.product.image.trim() !== '' ? item.product.image : 'https://via.placeholder.com/150x150.png?text=Product+Image',
           url: item.product.url || '#',
           store: item.product.store || 'unknown'
         })),
