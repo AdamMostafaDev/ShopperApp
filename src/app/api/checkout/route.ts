@@ -63,12 +63,28 @@ export async function POST(request: NextRequest) {
     const orderCount = await prisma.order.count();
     const orderNumber = (100000 + orderCount).toString();
 
+    // Process cartItems to ensure image URLs are valid and properly formatted
+    const processedItems = cartItems.map((item: any) => ({
+      ...item,
+      product: {
+        ...item.product,
+        // Ensure image URL is valid and use placeholder if not
+        image: (item.product.image &&
+                item.product.image.trim() !== '' &&
+                (item.product.image.startsWith('http://') ||
+                 item.product.image.startsWith('https://') ||
+                 item.product.image.startsWith('//')))
+               ? item.product.image
+               : 'https://via.placeholder.com/150x150.png?text=Product'
+      }
+    }));
+
     // Create order in database first
     const order = await prisma.order.create({
       data: {
         orderNumber,
         userId: parseInt(session.user.id), // Convert string to int
-        items: cartItems,
+        items: processedItems,
         productCostBdt: totals.subtotal,
         serviceChargeBdt: totals.serviceCharge,
         shippingCostBdt: 0, // Set to 0, admin will update later
@@ -173,7 +189,7 @@ export async function POST(request: NextRequest) {
           price: item.product.price,
           originalPriceValue: item.product.originalPrice || (item.product.price / 121.17), // fallback exchange rate
           quantity: item.quantity,
-          image: item.product.image || 'https://via.placeholder.com/100x100',
+          image: item.product.image && item.product.image.trim() !== '' ? item.product.image : 'https://via.placeholder.com/150x150.png?text=Product+Image',
           url: item.product.url || '#',
           store: item.product.store || 'unknown'
         })),
