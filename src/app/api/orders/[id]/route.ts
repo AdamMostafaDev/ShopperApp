@@ -65,9 +65,10 @@ export async function GET(
       refundDeadline: order.refundDeadline,
       // Order tracking statuses
       orderPlacedStatus: order.orderPlacedStatus,
-      paymentConfirmationStatus: order.paymentConfirmationStatus,
-      shippedStatus: order.shippedStatus,
-      outForDeliveryStatus: order.outForDeliveryStatus,
+      paymentConfirmationStatus: order.paymentStatus,
+      shippedToUsStatus: order.shippedToUsStatus,
+      shippedToBdStatus: order.shippedToBdStatus,
+      domesticFulfillmentStatus: order.domesticFulfillmentStatus,
       deliveredStatus: order.deliveredStatus,
       // Pricing fields for display utils
       productCostBdt: order.productCostBdt ? Number(order.productCostBdt) : null,

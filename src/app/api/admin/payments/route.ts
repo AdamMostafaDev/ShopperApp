@@ -17,13 +17,13 @@ export async function GET(request: Request) {
     if (status && status !== 'all') {
       switch (status) {
         case 'pending':
-          whereClause.paymentConfirmationStatus = 'PENDING';
+          whereClause.paymentStatus = 'PENDING';
           break;
         case 'complete':
-          whereClause.paymentConfirmationStatus = 'COMPLETE';
+          whereClause.paymentStatus = 'PAID';
           break;
         case 'failed':
-          whereClause.paymentConfirmationStatus = 'FAILED';
+          whereClause.paymentStatus = 'FAILED';
           break;
       }
     }
@@ -80,7 +80,6 @@ export async function GET(request: Request) {
         formattedUsd: `$${Number(order.totalAmountUsd || 0).toFixed(2)}`
       },
       paymentStatus: order.paymentStatus,
-      paymentConfirmationStatus: order.paymentConfirmationStatus,
       stripePaymentIntentId: order.stripePaymentIntentId || '',
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
@@ -101,12 +100,12 @@ export async function GET(request: Request) {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const pendingConfirmation = await prisma.order.count({
-      where: { paymentConfirmationStatus: 'PENDING' }
+      where: { paymentStatus: 'PENDING' }
     });
 
     const confirmedToday = await prisma.order.count({
       where: {
-        paymentConfirmationStatus: 'COMPLETE',
+        paymentStatus: 'PAID',
         updatedAt: {
           gte: today,
           lt: tomorrow
@@ -115,7 +114,7 @@ export async function GET(request: Request) {
     });
 
     const totalConfirmed = await prisma.order.count({
-      where: { paymentConfirmationStatus: 'COMPLETE' }
+      where: { paymentStatus: 'PAID' }
     });
 
     const totalAmountData = await prisma.order.aggregate({
@@ -123,7 +122,7 @@ export async function GET(request: Request) {
         totalAmountBdt: true
       },
       where: {
-        paymentConfirmationStatus: 'COMPLETE',
+        paymentStatus: 'PAID',
         status: {
           not: 'CANCELLED'
         }

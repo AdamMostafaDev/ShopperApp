@@ -59,16 +59,6 @@
               height: 80px !important;
           }
 
-          .button-container {
-              display: block !important;
-          }
-
-          .button-cell {
-              display: block !important;
-              width: 100% !important;
-              padding: 5px 0 !important;
-          }
-
           .timeline-icon {
               width: 40px !important;
               height: 40px !important;
@@ -101,16 +91,17 @@
                           <table border="0" cellpadding="0" cellspacing="0" width="100%">
                               <tr>
                                   <td align="center">
-                                      <!-- Success Checkmark Icon -->
-                                      <div style="width: 80px; height: 80px; margin: 0 auto 20px; background-color: #27ae60; border-radius: 50%; display: inline-block;">
-                                          <div style="color: white; font-size: 48px; line-height: 80px; text-align: center;">✓</div>
+                                      <!-- BD Warehouse Icon -->
+                                      <div style="width: 80px; height: 80px; margin: 0 auto 20px; background-color: #f97316; border-radius: 50%; display: inline-block;">
+                                          <div style="color: white; font-size: 36px; line-height: 80px; text-align: center;">
+                                              🇧🇩</div>
                                       </div>
-                                      <h2 style="color: #27ae60; margin: 0 0 10px 0; font-size: 28px; text-align: center;">
-                                          Payment Confirmed!</h2>
+                                      <h2 style="color: #f97316; margin: 0 0 10px 0; font-size: 28px; text-align: center;">
+                                          Package Arrived in Bangladesh!</h2>
                                       <p style="color: #2c3e50; margin: 0 0 10px 0; font-size: 18px; font-weight: bold; text-align: center;">
-                                          Thank you, {{ event.customer_name }}!</p>
+                                          Excellent news, {{ event.customer_name }}!</p>
                                       <p style="color: #7f8c8d; margin: 0 0 20px 0; font-size: 16px; text-align: center; line-height: 1.6;">
-                                          Your payment has been successfully confirmed. We're now processing your order and will begin purchasing your items from our US suppliers.</p>
+                                          Your order has successfully arrived at our Bangladesh warehouse and is now being processed for customs clearance and final delivery preparation.</p>
                                   </td>
                               </tr>
                           </table>
@@ -123,31 +114,34 @@
                           <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8f9fa; border-radius: 8px; padding: 20px;">
                               <tr>
                                   <td style="padding: 20px;">
-                                      <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">Order Summary</h3>
+                                      <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">Arrival Details
+                                      </h3>
                                       <table border="0" cellpadding="0" cellspacing="0" width="100%">
                                           <tr>
                                               <td style="padding: 8px 0; color: #7f8c8d;">Order Number:</td>
-                                              <td align="right" style="padding: 8px 0; color: #2c3e50; font-weight: bold; font-size: 16px;">{{ event.order_number }}</td>
+                                              <td align="right" style="padding: 8px 0; color: #2c3e50; font-weight: bold; font-size: 16px;">
+                                                  {{ event.order_number }}</td>
                                           </tr>
                                           <tr>
-                                              <td style="padding: 8px 0; color: #7f8c8d;">Payment Date:</td>
-                                              <td align="right" style="padding: 8px 0; color: #2c3e50;">{{ event.formatted_payment_date }}</td>
+                                              <td style="padding: 8px 0; color: #7f8c8d;">BD Warehouse Arrival:</td>
+                                              <td align="right" style="padding: 8px 0; color: #2c3e50;">{{
+                                                  event.bd_arrival_date }}</td>
                                           </tr>
                                           <tr>
-                                              <td style="padding: 8px 0; color: #7f8c8d;">Payment Method:</td>
-                                              <td align="right" style="padding: 8px 0; color: #2c3e50;">Credit/Debit Card</td>
+                                              <td style="padding: 8px 0; color: #7f8c8d;">Items Count:</td>
+                                              <td align="right" style="padding: 8px 0; color: #2c3e50;">{{
+                                                  event.item_count }}</td>
                                           </tr>
                                           <tr>
-                                              <td style="padding: 8px 0; color: #7f8c8d;">Transaction ID:</td>
-                                              <td align="right" style="padding: 8px 0; color: #2c3e50; font-family: monospace; font-size: 12px;">{{ event.transaction_id }}</td>
+                                              <td style="padding: 8px 0; color: #7f8c8d;">Package Weight:</td>
+                                              <td align="right" style="padding: 8px 0; color: #2c3e50;">{{
+                                                  event.package_weight }} kg</td>
                                           </tr>
                                           <tr style="border-top: 2px solid #dee2e6;">
-                                              <td style="padding: 12px 0 8px 0; color: #2c3e50; font-weight: bold; font-size: 18px;">Total Paid:</td>
-                                              <td align="right" style="padding: 12px 0 8px 0; color: #27ae60; font-weight: bold; font-size: 20px;">{{ event.formatted_total_bdt }}</td>
-                                          </tr>
-                                          <tr>
-                                              <td></td>
-                                              <td align="right" style="color: #7f8c8d; font-size: 14px;">{{ event.formatted_total_usd }} USD</td>
+                                              <td style="padding: 12px 0 8px 0; color: #2c3e50; font-weight: bold; font-size: 18px;">
+                                                  Order Total:</td>
+                                              <td align="right" style="padding: 12px 0 8px 0; color: #f97316; font-weight: bold; font-size: 20px;">
+                                                  {{ event.formatted_total_bdt }}</td>
                                           </tr>
                                       </table>
                                   </td>
@@ -156,10 +150,10 @@
                       </td>
                   </tr>
 
-                  <!-- What's Next Section -->
+                  <!-- Final Delivery Timeline Section -->
                   <tr>
                       <td class="mobile-padding" style="padding: 20px 40px;">
-                          <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; text-align: center;">What Happens Next?</h3>
+                          <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; text-align: center;">Final Delivery Steps</h3>
 
                           <!-- Timeline -->
                           <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px;">
@@ -167,38 +161,41 @@
                               <tr>
                                   <td width="60" valign="top">
                                       <div class="timeline-icon" style="width: 50px; height: 50px; background-color: #27ae60; border-radius: 50%; display: inline-block;">
-                                          <div style="color: white; font-size: 24px; line-height: 50px; text-align: center;">✓</div>
+                                          <div style="color: white; font-size: 24px; line-height: 50px; text-align: center;">
+                                              ✓</div>
                                       </div>
                                   </td>
                                   <td valign="top" style="padding-left: 20px; padding-bottom: 30px;">
-                                      <h4 style="color: #27ae60; margin: 0 0 5px 0; font-size: 16px;">Payment Confirmed</h4>
-                                      <p style="color: #7f8c8d; margin: 0; font-size: 14px; line-height: 1.5;">Your payment has been successfully processed</p>
+                                      <h4 style="color: #27ae60; margin: 0 0 5px 0; font-size: 16px;">International Shipping</h4>
+                                      <p style="color: #7f8c8d; margin: 0; font-size: 14px; line-height: 1.5;">Package successfully transported from US facility</p>
                                   </td>
                               </tr>
 
-                              <!-- Step 2 - In Progress -->
+                              <!-- Step 2 - Completed -->
                               <tr>
                                   <td width="60" valign="top">
-                                      <div class="timeline-icon" style="width: 50px; height: 50px; background-color: #3498db; border-radius: 50%; display: inline-block; animation: pulse 2s infinite;">
-                                          <div style="color: white; font-size: 24px; line-height: 50px; text-align: center;">→</div>
+                                      <div class="timeline-icon" style="width: 50px; height: 50px; background-color: #27ae60; border-radius: 50%; display: inline-block;">
+                                          <div style="color: white; font-size: 24px; line-height: 50px; text-align: center;">
+                                              ✓</div>
                                       </div>
                                   </td>
                                   <td valign="top" style="padding-left: 20px; padding-bottom: 30px;">
-                                      <h4 style="color: #3498db; margin: 0 0 5px 0; font-size: 16px;">Ordering from US Suppliers</h4>
-                                      <p style="color: #7f8c8d; margin: 0; font-size: 14px; line-height: 1.5;">We're now purchasing your items and having them delivered to our US warehouse (3-7 business days)</p>
+                                      <h4 style="color: #27ae60; margin: 0 0 5px 0; font-size: 16px;">Arrived in Bangladesh</h4>
+                                      <p style="color: #7f8c8d; margin: 0; font-size: 14px; line-height: 1.5;">Package received at our Dhaka warehouse facility</p>
                                   </td>
                               </tr>
 
-                              <!-- Step 3 - Upcoming -->
+                              <!-- Step 3 - In Progress -->
                               <tr>
                                   <td width="60" valign="top">
-                                      <div class="timeline-icon" style="width: 50px; height: 50px; background-color: #ecf0f1; border-radius: 50%; display: inline-block;">
-                                          <div style="color: #95a5a6; font-size: 24px; line-height: 50px; text-align: center;">📦</div>
+                                      <div class="timeline-icon" style="width: 50px; height: 50px; background-color: #f97316; border-radius: 50%; display: inline-block; animation: pulse 2s infinite;">
+                                          <div style="color: white; font-size: 24px; line-height: 50px; text-align: center;">
+                                              📋</div>
                                       </div>
                                   </td>
                                   <td valign="top" style="padding-left: 20px; padding-bottom: 30px;">
-                                      <h4 style="color: #7f8c8d; margin: 0 0 5px 0; font-size: 16px;">Warehouse Processing</h4>
-                                      <p style="color: #95a5a6; margin: 0; font-size: 14px; line-height: 1.5;">Quality check and consolidation at our US warehouse</p>
+                                      <h4 style="color: #f97316; margin: 0 0 5px 0; font-size: 16px;">Customs & Quality Check</h4>
+                                      <p style="color: #7f8c8d; margin: 0; font-size: 14px; line-height: 1.5;">{{ event.current_process }} (Expected completion: {{ event.expected_completion }})</p>
                                   </td>
                               </tr>
 
@@ -206,12 +203,13 @@
                               <tr>
                                   <td width="60" valign="top">
                                       <div class="timeline-icon" style="width: 50px; height: 50px; background-color: #ecf0f1; border-radius: 50%; display: inline-block;">
-                                          <div style="color: #95a5a6; font-size: 24px; line-height: 50px; text-align: center;">✈️</div>
+                                          <div style="color: #95a5a6; font-size: 24px; line-height: 50px; text-align: center;">
+                                              🚛</div>
                                       </div>
                                   </td>
                                   <td valign="top" style="padding-left: 20px; padding-bottom: 30px;">
-                                      <h4 style="color: #7f8c8d; margin: 0 0 5px 0; font-size: 16px;">International Shipping</h4>
-                                      <p style="color: #95a5a6; margin: 0; font-size: 14px; line-height: 1.5;">Your package will be shipped to Bangladesh (15-20 days)</p>
+                                      <h4 style="color: #7f8c8d; margin: 0 0 5px 0; font-size: 16px;">Out for Delivery</h4>
+                                      <p style="color: #95a5a6; margin: 0; font-size: 14px; line-height: 1.5;">Package dispatched for final delivery to your address</p>
                                   </td>
                               </tr>
 
@@ -219,38 +217,38 @@
                               <tr>
                                   <td width="60" valign="top">
                                       <div class="timeline-icon" style="width: 50px; height: 50px; background-color: #ecf0f1; border-radius: 50%; display: inline-block;">
-                                          <div style="color: #95a5a6; font-size: 24px; line-height: 50px; text-align: center;">🏠</div>
+                                          <div style="color: #95a5a6; font-size: 24px; line-height: 50px; text-align: center;">
+                                              🏠</div>
                                       </div>
                                   </td>
                                   <td valign="top" style="padding-left: 20px;">
-                                      <h4 style="color: #7f8c8d; margin: 0 0 5px 0; font-size: 16px;">Local Delivery</h4>
-                                      <p style="color: #95a5a6; margin: 0; font-size: 14px; line-height: 1.5;">Final delivery to your address in Bangladesh</p>
+                                      <h4 style="color: #7f8c8d; margin: 0 0 5px 0; font-size: 16px;">Delivery Complete</h4>
+                                      <p style="color: #95a5a6; margin: 0; font-size: 14px; line-height: 1.5;">Package delivered to your doorstep in Bangladesh</p>
                                   </td>
                               </tr>
                           </table>
                       </td>
                   </tr>
 
-                  <!-- Payment Summary -->
+                  <!-- Final Steps Timeline -->
                   <tr>
                       <td class="mobile-padding" style="padding: 20px 40px;">
-                          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #e8f5e9; border-radius: 8px; padding: 20px; border: 1px solid #c8e6c9;">
+                          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #fff7ed; border-radius: 8px; padding: 20px; border: 1px solid #fed7aa;">
                               <tr>
                                   <td style="padding: 20px; text-align: center;">
-                                      <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">Payment Summary</h3>
-                                      <p style="color: #2c3e50; margin: 0 0 10px 0; font-size: 20px; font-weight: bold;">
-                                          Total Amount Paid
-                                      </p>
-                                      <p style="color: #27ae60; margin: 0 0 5px 0; font-size: 32px; font-weight: bold;">
-                                          {{ event.formatted_total_bdt }}
-                                      </p>
-                                      <p style="color: #7f8c8d; margin: 0; font-size: 14px;">
-                                          ({{ event.formatted_total_usd }} USD at ৳{{ event.exchange_rate }} per USD)
-                                      </p>
-                                      <p style="color: #27ae60; margin: 15px 0 0 0; font-size: 14px;">
-                                          <span style="display: inline-block; padding: 5px 10px; background-color: #d4edda; border-radius: 20px;">
-                                              ✓ Payment Successfully Processed
-                                          </span>
+                                      <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">🚀 Almost There!</h3>
+                                      <div style="display: flex; justify-content: space-around; max-width: 400px; margin: 0 auto;">
+                                          <div style="text-align: center; flex: 1;">
+                                              <div style="color: #f97316; font-size: 24px; font-weight: bold; margin-bottom: 5px;">1-2</div>
+                                              <div style="color: #6b7280; font-size: 14px;">Days for customs clearance</div>
+                                          </div>
+                                          <div style="text-align: center; flex: 1; border-left: 1px solid #fed7aa; padding-left: 20px;">
+                                              <div style="color: #f97316; font-size: 24px; font-weight: bold; margin-bottom: 5px;">1-2</div>
+                                              <div style="color: #6b7280; font-size: 14px;">Days for local delivery</div>
+                                          </div>
+                                      </div>
+                                      <p style="color: #7f8c8d; margin: 15px 0 0 0; font-size: 12px; font-style: italic;">
+                                          📞 We'll contact you before delivery to confirm your availability
                                       </p>
                                   </td>
                               </tr>
@@ -258,32 +256,21 @@
                       </td>
                   </tr>
 
-                  <!-- Items Ordered -->
+                  <!-- Important Information -->
                   <tr>
                       <td class="mobile-padding" style="padding: 20px 40px;">
-                          <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px;">Items Being Ordered</h3>
-                          <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                              {% for item in event.items %}
+                          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #e0f2fe; border-radius: 8px; padding: 20px; border: 1px solid #7dd3fc;">
                               <tr>
-                                  <td style="padding: 15px; border: 1px solid #ecf0f1; border-radius: 8px; margin-bottom: 10px;">
-                                      <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                                          <tr>
-                                              <td width="100" valign="top">
-                                                  <img src="{{ item.product_image }}" alt="{{ item.product_name }}" class="product-image" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px;">
-                                              </td>
-                                              <td valign="top" style="padding-left: 20px;">
-                                                  <h4 style="color: #2c3e50; margin: 0 0 5px 0; font-size: 16px;">{{ item.product_name }}</h4>
-                                                  <p style="color: #7f8c8d; margin: 0 0 5px 0; font-size: 14px;">
-                                                      Store: {{ item.store }}<br>
-                                                      Quantity: {{ item.quantity }}<br>
-                                                      Price: ৳{{ item.price_bdt }} per item
-                                                  </p>
-                                              </td>
-                                          </tr>
-                                      </table>
+                                  <td style="padding: 20px;">
+                                      <h3 style="color: #0c4a6e; margin: 0 0 15px 0; font-size: 16px;">📋 Important Information</h3>
+                                      <ul style="color: #075985; margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6;">
+                                          <li style="margin-bottom: 8px;">Please ensure someone is available at your delivery address during business hours</li>
+                                          <li style="margin-bottom: 8px;">Keep your phone accessible as our delivery team will contact you</li>
+                                          <li style="margin-bottom: 8px;">Have a valid ID ready for package verification</li>
+                                          <li>Any customs duties or local taxes will be communicated before delivery</li>
+                                      </ul>
                                   </td>
                               </tr>
-                              {% endfor %}
                           </table>
                       </td>
                   </tr>
@@ -294,13 +281,12 @@
                           <table border="0" cellspacing="0" cellpadding="0">
                               <tr>
                                   <td align="center">
-                                      <a href="{{ event.order_details_url }}" style="display: inline-block; padding: 16px 32px; background-color: #3498db; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; min-width: 180px; text-align: center;">View Order</a>
+                                      <a href="{{ event.order_details_url }}" style="display: inline-block; padding: 16px 32px; background-color: #f97316; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; min-width: 180px; text-align: center;">Track Final Delivery</a>
                                   </td>
                               </tr>
                           </table>
                       </td>
                   </tr>
-
 
                   <!-- Customer Information -->
                   <tr>
@@ -312,13 +298,15 @@
                                       <table border="0" cellpadding="0" cellspacing="0" width="100%">
                                           <tr>
                                               <td width="50%" valign="top" style="padding-right: 20px;">
-                                                  <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 14px;">Shipping Address</h4>
+                                                  <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 14px;">
+                                                      Delivery Address</h4>
                                                   <p style="color: #2c3e50; margin: 0; font-size: 14px; line-height: 1.6;">
                                                       {{ event.customer_address|safe }}
                                                   </p>
                                               </td>
                                               <td width="50%" valign="top" style="padding-left: 20px;">
-                                                  <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 14px;">Contact Details</h4>
+                                                  <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 14px;">
+                                                      Contact Details</h4>
                                                   <p style="color: #2c3e50; margin: 0; font-size: 14px; line-height: 1.6;">
                                                       Email: {{ event.customer_email }}<br>
                                                       Phone: {{ event.customer_phone }}
@@ -342,9 +330,9 @@
                                           Thank you for choosing UniShopper for your international shopping needs!
                                       </p>
                                       <p style="color: #7f8c8d; margin: 0 0 10px 0; font-size: 14px;">
-                                          Questions about your order? We're here to help!
+                                          Questions about your delivery? We're here to help!
                                       </p>
-                                      <a href="mailto:support@unishopper.com" style="color: #3498db; text-decoration: none; font-size: 14px; font-weight: bold;">Contact Support</a>
+                                      <a href="mailto:support@unishopper.com" style="color: #f97316; text-decoration: none; font-size: 14px; font-weight: bold;">Contact Support</a>
                                   </td>
                               </tr>
                               <tr>

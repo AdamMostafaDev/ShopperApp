@@ -88,9 +88,10 @@ export async function GET(request: Request) {
         // International shipping workflow statuses
         workflow: {
           orderPlaced: order.orderPlacedStatus,
-          paymentConfirmation: order.paymentConfirmationStatus,
-          shipped: order.shippedStatus,
-          outForDelivery: order.outForDeliveryStatus,
+          paymentConfirmation: order.paymentStatus,
+          shippedToUs: order.shippedToUsStatus,
+          shippedToBd: order.shippedToBdStatus,
+          domesticFulfillment: order.domesticFulfillmentStatus,
           delivered: order.deliveredStatus
         },
 

@@ -52,4 +52,26 @@
 - [ ] **2.2** Add EmailVerificationToken model to Prisma schema
 - [ ] **2.2** Update User model with emailVerificationTokens relation
 
+# Phase 3 Update payment ui:
 
+A: Database Migration
+
+  1. Create migration to remove payment_confirmation_status column
+  2. Ensure payment_status has all needed values
+
+ B: Backend Updates
+
+  1. Update all API endpoints to remove payment confirmation references
+  2. Map workflow.paymentConfirmation to paymentStatus
+  3. Update status change handlers
+
+ C: Frontend Updates
+
+  1. Remove Payment Confirmation dropdown from admin UI
+  2. Update customer-facing pages
+  3. Update dashboard components
+
+  D: Email/Klaviyo Updates
+
+  1. Review and update email logic
+  2. Ensure templates still work correctly
