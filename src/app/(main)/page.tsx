@@ -56,6 +56,19 @@ const popularProducts = [
   'JBL Flip 6', 'Samsung Galaxy Buds', 'Apple Magic Keyboard', 'Logitech MX Master 3'
 ];
 
+const dynamicPlaceholders = [
+  'Buy iPhone 15 Pro at Apple',
+  'Get MacBook Air at Best Buy',
+  'Shop Nike Air Max at Nike',
+  'Find Samsung TV at Target',
+  'Buy AirPods Pro at Amazon',
+  'Get PlayStation 5 at Walmart',
+  'Shop Canon Camera at B&H',
+  'Find KitchenAid Mixer at Macy\'s',
+  'Buy Tesla Model Y at Tesla',
+  'Get iPad Pro at Costco'
+];
+
 interface LiveOrder {
   id: string;
   name: string;
@@ -120,6 +133,8 @@ export default function Home() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [showUnsupportedMessage, setShowUnsupportedMessage] = useState(false);
   const [liveOrders, setLiveOrders] = useState<LiveOrder[]>([]);
+  const [currentPlaceholder, setCurrentPlaceholder] = useState(0);
+  const [typedPlaceholder, setTypedPlaceholder] = useState('');
   const { addToCart } = useCart();
 
   // State for current highlighted order
@@ -188,6 +203,35 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
+  // Typing animation for placeholder text
+  useEffect(() => {
+    const animateTyping = async () => {
+      const targetText = dynamicPlaceholders[currentPlaceholder];
+
+      if (!targetText) return;
+
+      // Type out the text
+      for (let i = 0; i <= targetText.length; i++) {
+        setTypedPlaceholder(targetText.substring(0, i));
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // Wait 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Delete the text
+      for (let i = targetText.length; i >= 0; i--) {
+        setTypedPlaceholder(targetText.substring(0, i));
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      // Move to next placeholder
+      setCurrentPlaceholder((prev) => (prev + 1) % dynamicPlaceholders.length);
+    };
+
+    animateTyping();
+  }, [currentPlaceholder]);
+
 
   // Function to detect if input is a URL
   const isUrl = (string: string): boolean => {
@@ -218,7 +262,7 @@ export default function Home() {
         return;
       }
 
-      // Handle Amazon link capture
+      // Handle Amazon link capture only
       try {
         const result = await captureProductFromUrl(query);
 
@@ -390,7 +434,7 @@ export default function Home() {
               </span>
             </h1>
             <p className="text-xl md:text-2xl mb-12 text-blue-100 max-w-3xl mx-auto leading-relaxed">
-              Access millions of Amazon products with guaranteed best prices.
+              Shop from Amazon with full integration, plus request products from any store worldwide.
               We handle everything from purchase to international delivery.
             </p>
 
@@ -405,7 +449,7 @@ export default function Home() {
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search Amazon products or paste an Amazon product link..."
+                        placeholder={`Paste Product URL to: ${typedPlaceholder}`}
                         className="w-full pl-12 pr-4 py-5 text-lg border-0 focus:ring-0 focus:outline-none text-gray-900 placeholder-gray-500 bg-transparent rounded-xl"
                       />
                     </div>
@@ -498,26 +542,30 @@ export default function Home() {
               </div>
             )}
 
-            {/* Unsupported Link Message */}
+            {/* Manual Entry Message */}
             {showUnsupportedMessage && (
-              <div className="mb-6 p-6 bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl text-center">
+              <div className="mb-6 p-6 bg-gradient-to-br from-orange-50 to-yellow-50 border border-orange-200 rounded-xl text-center">
                 <div className="flex items-center justify-center mb-4">
-                  <svg className="h-8 w-8 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg className="h-8 w-8 text-orange-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-bold text-yellow-800 mb-2">Link Not Supported Yet</h3>
-                <p className="text-yellow-700 mb-4">
-                  This link is not supported. We currently only support Amazon product links.
+                <h3 className="text-lg font-bold text-orange-800 mb-2">Manual Product Entry</h3>
+                <p className="text-orange-700 mb-4">
+                  We'll manually type up this product for you! Just paste the product URL and we'll handle the rest.
                 </p>
-                <p className="text-yellow-600 text-sm mb-4">
-                  More stores coming soon! Contact support for special requests.
+                <div className="flex justify-center gap-2 text-sm mb-4">
+                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full font-medium">✓ Amazon - Auto</span>
+                  <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full font-medium">📝 Others - Manual Entry</span>
+                </div>
+                <p className="text-orange-600 text-sm mb-4">
+                  Our team will extract product details and add it to your cart within 24 hours.
                 </p>
                 <Link
                   href="/contact"
-                  className="inline-block bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-6 py-2 rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all font-semibold shadow-md"
+                  className="inline-block bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-6 py-2 rounded-lg hover:from-orange-600 hover:to-yellow-600 transition-all font-semibold shadow-md"
                 >
-                  Contact Support
+                  Submit Product URL
                 </Link>
               </div>
             )}

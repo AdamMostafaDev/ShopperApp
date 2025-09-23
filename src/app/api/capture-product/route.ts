@@ -17,7 +17,8 @@ interface ScrapedProduct {
   description?: string;
   features?: string[];
   availability: 'in_stock' | 'out_of_stock' | 'limited';
-  store: 'amazon' | 'walmart' | 'ebay';
+  store: 'amazon' | 'walmart' | 'ebay' | 'other';
+  storeName?: string; // Store name for non-partner sites
 }
 
 function detectStore(url: string): 'amazon' | 'walmart' | 'ebay' | null {
@@ -579,6 +580,395 @@ async function scrapeAmazonFallback(url: string): Promise<ScrapedProduct | null>
   }
 }
 
+async function scrapeUniversalWithScraperAPI(url: string): Promise<ScrapedProduct | null> {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const apiKey = process.env.SCRAPER_API_KEY;
+      if (!apiKey) {
+        throw new Error('ScraperAPI key not configured');
+      }
+
+      console.log(`🔄 Universal ScraperAPI attempt ${attempt}/${MAX_RETRIES} for URL: ${url}`);
+
+      // Use raw scraping API with render=true for dynamic content
+      const encodedUrl = encodeURIComponent(url);
+      const scraperUrl = `https://api.scraperapi.com/?api_key=${apiKey}&url=${encodedUrl}&render=true&wait_for=3&timeout=60000`;
+
+      const response = await fetch(scraperUrl, {
+        timeout: 70000
+      });
+
+      if (!response.ok) {
+        throw new Error(`ScraperAPI HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const html = await response.text();
+      const $ = cheerio.load(html);
+
+      // Extract store name from URL
+      let storeName = '';
+      try {
+        const hostname = new URL(url).hostname;
+        storeName = hostname.replace('www.', '').split('.')[0];
+        storeName = storeName.charAt(0).toUpperCase() + storeName.slice(1);
+      } catch (e) {
+        storeName = 'Online Store';
+      }
+
+      // Dynamic title extraction - try multiple common selectors
+      let title = '';
+      const titleSelectors = [
+        'h1',
+        '[itemprop="name"]',
+        '.product-title',
+        '.product-name',
+        '.product_title',
+        '.item-title',
+        '[data-testid*="title"]',
+        '.title',
+        'meta[property="og:title"]',
+        'meta[name="twitter:title"]',
+        'title'
+      ];
+
+      for (const selector of titleSelectors) {
+        if (selector.startsWith('meta')) {
+          const element = $(selector).first();
+          const content = element.attr('content');
+          if (content && content.trim()) {
+            title = content.trim();
+            break;
+          }
+        } else if (selector === 'title') {
+          const element = $(selector).first();
+          if (element.text().trim()) {
+            // Remove store name from title if present
+            title = element.text().trim().replace(/ - .+$/, '');
+            break;
+          }
+        } else {
+          const element = $(selector).first();
+          if (element.text().trim() && element.text().length > 5) {
+            title = element.text().trim();
+            break;
+          }
+        }
+      }
+
+      if (!title) {
+        throw new Error('Could not extract product title');
+      }
+
+      // Dynamic price extraction
+      let originalPriceValue = 0;
+      let currency = 'USD';
+
+      const priceSelectors = [
+        '[itemprop="price"]',
+        '.price',
+        '.product-price',
+        '.regular-price',
+        '.sale-price',
+        '.current-price',
+        '[data-testid*="price"]',
+        '.amount',
+        'meta[property="product:price:amount"]',
+        'meta[property="og:price:amount"]',
+        'span[class*="price"]:not([class*="old"]):not([class*="was"])',
+        'div[class*="price"]:not([class*="old"]):not([class*="was"])',
+        'p[class*="price"]'
+      ];
+
+      for (const selector of priceSelectors) {
+        if (selector.startsWith('meta')) {
+          const element = $(selector).first();
+          const content = element.attr('content');
+          if (content) {
+            const parsed = parseFloat(content);
+            if (parsed > 0) {
+              originalPriceValue = parsed;
+              // Try to get currency from meta tag
+              const currencyMeta = $('meta[property="product:price:currency"], meta[property="og:price:currency"]').first();
+              if (currencyMeta.attr('content')) {
+                currency = currencyMeta.attr('content');
+              }
+              break;
+            }
+          }
+        } else {
+          const element = $(selector).first();
+          const priceText = element.text().trim() || element.attr('content') || element.attr('data-price');
+          if (priceText) {
+            const parsedPrice = parsePriceFromScrapedText(priceText);
+            if (parsedPrice > 0) {
+              originalPriceValue = parsedPrice;
+              currency = detectCurrency(priceText);
+              break;
+            }
+          }
+        }
+      }
+
+      // If still no price, try JSON-LD structured data
+      if (originalPriceValue <= 0) {
+        const jsonLdScripts = $('script[type="application/ld+json"]');
+        jsonLdScripts.each((i, script) => {
+          try {
+            const json = JSON.parse($(script).html() || '{}');
+            if (json['@type'] === 'Product' && json.offers) {
+              const offers = Array.isArray(json.offers) ? json.offers[0] : json.offers;
+              if (offers.price) {
+                originalPriceValue = parseFloat(offers.price);
+                currency = offers.priceCurrency || 'USD';
+              }
+            }
+          } catch (e) {
+            // Invalid JSON, skip
+          }
+        });
+      }
+
+      if (originalPriceValue <= 0) {
+        console.log('⚠️ Warning: Could not extract price, will continue with 0');
+      }
+
+      // Dynamic image extraction
+      let image = '';
+      const imageSelectors = [
+        'meta[property="og:image"]',
+        'meta[name="twitter:image"]',
+        '[itemprop="image"]',
+        '.product-image img',
+        '.product-photo img',
+        '.main-image img',
+        '[data-testid*="image"] img',
+        'picture img',
+        'img[alt*="product"]',
+        'img[class*="product"]',
+        'img[src*="product"]'
+      ];
+
+      for (const selector of imageSelectors) {
+        if (selector.startsWith('meta')) {
+          const element = $(selector).first();
+          const content = element.attr('content');
+          if (content) {
+            image = content;
+            // Make sure it's an absolute URL
+            if (image.startsWith('//')) {
+              image = 'https:' + image;
+            } else if (image.startsWith('/')) {
+              const baseUrl = new URL(url);
+              image = baseUrl.origin + image;
+            }
+            break;
+          }
+        } else {
+          const element = $(selector).first();
+          const src = element.attr('src') || element.attr('data-src') || element.attr('srcset')?.split(',')[0]?.trim().split(' ')[0];
+          if (src) {
+            image = src;
+            // Make sure it's an absolute URL
+            if (image.startsWith('//')) {
+              image = 'https:' + image;
+            } else if (image.startsWith('/')) {
+              const baseUrl = new URL(url);
+              image = baseUrl.origin + image;
+            }
+            break;
+          }
+        }
+      }
+
+      // Convert price to BDT if needed
+      let bdtPrice: number = 0;
+      if (originalPriceValue > 0) {
+        if (currency === 'BDT') {
+          bdtPrice = originalPriceValue;
+        } else {
+          bdtPrice = await convertToBdt(originalPriceValue, currency);
+        }
+      }
+
+      console.log(`✅ Universal scraping successful: ${title.substring(0, 50)}...`);
+
+      return {
+        title,
+        price: bdtPrice,
+        originalCurrency: currency,
+        originalPriceValue: originalPriceValue,
+        image,
+        availability: 'in_stock',
+        store: 'other',
+        storeName
+      };
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`❌ Universal ScraperAPI attempt ${attempt} failed:`, errorMessage);
+
+      if (attempt === MAX_RETRIES) {
+        console.error('🚫 All Universal ScraperAPI attempts failed');
+        return null;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+    }
+  }
+
+  return null;
+}
+
+async function scrapeUniversalFallback(url: string): Promise<ScrapedProduct | null> {
+  try {
+    console.log('📋 Using Universal HTML fallback scraper');
+
+    // Make HTTP request with realistic headers
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br'
+      },
+      timeout: 30000
+    });
+
+    const $ = cheerio.load(response.data);
+
+    // Extract store name from URL
+    let storeName = '';
+    try {
+      const hostname = new URL(url).hostname;
+      storeName = hostname.replace('www.', '').split('.')[0];
+      storeName = storeName.charAt(0).toUpperCase() + storeName.slice(1);
+    } catch (e) {
+      storeName = 'Online Store';
+    }
+
+    // Try to extract from OpenGraph tags first (most reliable)
+    let title = $('meta[property="og:title"]').attr('content') ||
+               $('meta[name="twitter:title"]').attr('content') || '';
+
+    if (!title) {
+      // Fall back to regular selectors
+      const titleSelectors = ['h1', '[itemprop="name"]', '.product-title', '.product-name', 'title'];
+      for (const selector of titleSelectors) {
+        const element = $(selector).first();
+        if (element.text().trim()) {
+          title = element.text().trim();
+          if (selector === 'title') {
+            // Clean up title tag
+            title = title.replace(/ - .+$/, '');
+          }
+          break;
+        }
+      }
+    }
+
+    if (!title) {
+      throw new Error('Could not extract product title');
+    }
+
+    // Extract price
+    let originalPriceValue = 0;
+    let currency = 'USD';
+
+    // Try OpenGraph price first
+    const ogPrice = $('meta[property="product:price:amount"], meta[property="og:price:amount"]').attr('content');
+    if (ogPrice) {
+      originalPriceValue = parseFloat(ogPrice);
+      const ogCurrency = $('meta[property="product:price:currency"], meta[property="og:price:currency"]').attr('content');
+      if (ogCurrency) {
+        currency = ogCurrency;
+      }
+    }
+
+    // If no OpenGraph price, try regular selectors
+    if (originalPriceValue <= 0) {
+      const priceSelectors = [
+        '[itemprop="price"]',
+        '.price:not(.old-price):not(.was-price)',
+        '.product-price',
+        '.current-price',
+        'span[class*="price"]:not([class*="old"]):not([class*="was"])'
+      ];
+
+      for (const selector of priceSelectors) {
+        const element = $(selector).first();
+        const priceText = element.text().trim() || element.attr('content');
+        if (priceText) {
+          const parsedPrice = parsePriceFromScrapedText(priceText);
+          if (parsedPrice > 0) {
+            originalPriceValue = parsedPrice;
+            currency = detectCurrency(priceText);
+            break;
+          }
+        }
+      }
+    }
+
+    // Extract image
+    let image = $('meta[property="og:image"]').attr('content') ||
+               $('meta[name="twitter:image"]').attr('content') || '';
+
+    if (!image) {
+      const imageSelectors = [
+        '[itemprop="image"]',
+        '.product-image img',
+        '.main-image img',
+        'img[alt*="product"]'
+      ];
+
+      for (const selector of imageSelectors) {
+        const element = $(selector).first();
+        const src = element.attr('src') || element.attr('data-src');
+        if (src) {
+          image = src;
+          // Make sure it's an absolute URL
+          if (image.startsWith('//')) {
+            image = 'https:' + image;
+          } else if (image.startsWith('/')) {
+            const baseUrl = new URL(url);
+            image = baseUrl.origin + image;
+          }
+          break;
+        }
+      }
+    }
+
+    // Convert price to BDT
+    let bdtPrice: number = 0;
+    if (originalPriceValue > 0) {
+      if (currency === 'BDT') {
+        bdtPrice = originalPriceValue;
+      } else {
+        bdtPrice = await convertToBdt(originalPriceValue, currency);
+      }
+    }
+
+    console.log(`✅ Universal fallback scraping successful: ${title.substring(0, 50)}...`);
+
+    return {
+      title,
+      price: bdtPrice,
+      originalCurrency: currency,
+      originalPriceValue: originalPriceValue,
+      image,
+      availability: 'in_stock',
+      store: 'other',
+      storeName
+    };
+
+  } catch (error) {
+    console.error('Universal fallback scraping error:', error);
+    return null;
+  }
+}
+
 async function scrapeAmazon(page: any, url: string): Promise<ScrapedProduct | null> {
   try {
     // Clean the URL to remove tracking parameters
@@ -871,34 +1261,41 @@ export async function POST(request: NextRequest) {
     }
 
     const store = detectStore(url);
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: 'Unsupported store. Please use Amazon, Walmart, or eBay links.' },
-        { status: 400 }
-      );
-    }
-
-
     let product: ScrapedProduct | null = null;
 
-    // Scrape based on store using ScraperAPI only
-    switch (store) {
-      case 'amazon':
-        console.log('Using ScraperAPI for Amazon...');
-        product = await scrapeAmazonWithScraperAPI(url);
-        break;
-      case 'walmart':
-        console.log('Walmart scraping not yet implemented with ScraperAPI');
-        return NextResponse.json(
-          { success: false, error: 'Walmart scraping temporarily unavailable. Please use Amazon or eBay links.' },
-          { status: 501 }
-        );
-      case 'ebay':
-        console.log('eBay scraping not yet implemented with ScraperAPI');
-        return NextResponse.json(
-          { success: false, error: 'eBay scraping temporarily unavailable. Please use Amazon links.' },
-          { status: 501 }
-        );
+    // Scrape based on store type
+    if (store) {
+      // Handle partner stores (Amazon, Walmart, eBay)
+      switch (store) {
+        case 'amazon':
+          console.log('Using ScraperAPI for Amazon...');
+          product = await scrapeAmazonWithScraperAPI(url);
+          break;
+        case 'walmart':
+          console.log('Walmart scraping not yet implemented with ScraperAPI');
+          return NextResponse.json(
+            { success: false, error: 'Walmart scraping temporarily unavailable. Please use Amazon or other links.' },
+            { status: 501 }
+          );
+        case 'ebay':
+          console.log('eBay scraping not yet implemented with ScraperAPI');
+          return NextResponse.json(
+            { success: false, error: 'eBay scraping temporarily unavailable. Please use Amazon or other links.' },
+            { status: 501 }
+          );
+      }
+    } else {
+      // Handle non-partner stores with universal scraper
+      console.log('🌐 Detected non-partner website, using universal scraper...');
+
+      // Try ScraperAPI first
+      product = await scrapeUniversalWithScraperAPI(url);
+
+      // If ScraperAPI fails, try fallback HTML scraper
+      if (!product) {
+        console.log('📋 ScraperAPI failed, trying HTML fallback...');
+        product = await scrapeUniversalFallback(url);
+      }
     }
 
     if (!product) {
@@ -909,7 +1306,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate a unique ID for the product
-    const productId = `${store}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const storeIdentifier = product.store === 'other' ? 'universal' : product.store;
+    const productId = `${storeIdentifier}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     return NextResponse.json({
       success: true,
