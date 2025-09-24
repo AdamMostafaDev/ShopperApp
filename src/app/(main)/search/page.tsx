@@ -310,7 +310,7 @@ export default function SearchPage() {
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-5 relative">
                   <Image
-                    src="/Amazon_logo_wiki.png"
+                    src="/assets/logos/Amazon_logo_wiki.png"
                     alt="Amazon"
                     fill
                     className="object-contain"

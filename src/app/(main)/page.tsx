@@ -526,6 +526,207 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Brand Carousel Section */}
+      <section className="py-12 bg-gradient-to-r from-gray-50 to-blue-50 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+            Shop Across Thousands of Stores From the US
+          </h2>
+          <p className="text-gray-600 mb-8 text-lg">
+            And ship directly to your home worldwide
+          </p>
+
+          {/* Dual-row infinite scrolling carousel */}
+          <div className="space-y-8">
+            {/* First row - scrolling left */}
+            <div className="relative overflow-hidden">
+              <div className="flex animate-scroll-left">
+                {/* Complete set of logos */}
+                <div className="flex shrink-0">
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/apple-logo.png" alt="Apple" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/gap.png" alt="Gap" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/samsung-new.png" alt="Samsung" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/sephora.png" alt="Sephora" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Amazon_logo_wiki.png" alt="Amazon" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/polo_ralph-lauren_new.png" alt="Ralph Lauren" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/nintendo-2-logo-png-transparent.png" alt="Nintendo" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/macys-logo.png" alt="Macy's" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/sony-2-logo-black-and-white.png" alt="Sony" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/l-oreal-logo.png" alt="L'Oreal" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Target_New.png" alt="Target" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/CK_Calvin_Klein_logo.png" alt="Calvin Klein" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/ebay-logo.png" alt="eBay" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Louis-Vuitton-logo.png" alt="Louis Vuitton" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Best_Buy_Logo.svg.png" alt="Best Buy" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                </div>
+                {/* Duplicate set for seamless loop */}
+                <div className="flex shrink-0">
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/apple-logo.png" alt="Apple" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/gap.png" alt="Gap" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/samsung-new.png" alt="Samsung" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/sephora.png" alt="Sephora" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Amazon_logo_wiki.png" alt="Amazon" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/polo_ralph-lauren_new.png" alt="Ralph Lauren" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/nintendo-2-logo-png-transparent.png" alt="Nintendo" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/macys-logo.png" alt="Macy's" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/sony-2-logo-black-and-white.png" alt="Sony" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/l-oreal-logo.png" alt="L'Oreal" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Target_New.png" alt="Target" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/CK_Calvin_Klein_logo.png" alt="Calvin Klein" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/ebay-logo.png" alt="eBay" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Louis-Vuitton-logo.png" alt="Louis Vuitton" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Best_Buy_Logo.svg.png" alt="Best Buy" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Second row - scrolling right */}
+            <div className="relative overflow-hidden">
+              <div className="flex animate-scroll-right">
+                {/* Complete set of logos */}
+                <div className="flex shrink-0">
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/tommy-hilfiger.jpg" alt="Tommy Hilfiger" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/walmart-logo.png" alt="Walmart" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Ray-Ban_logo.png" alt="Ray-Ban" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/shop-disney-logo.png" alt="Disney" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/The-Fourth-Nike-Logo-Evolution-1971-–-now.png" alt="Nike" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Microsoft logo.png" alt="Microsoft" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/puma-black-logo-png-701751694774568gw2on2y0un.png" alt="Puma" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/adidas logo.png" alt="Adidas" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/ready-edit-nordstrom-logo-transparent-2.png" alt="Nordstrom" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Zara_Logo-new.png" alt="Zara" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/carters-logo-120x120.png" alt="Carter's" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Prada-Symbol.png" alt="Prada" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                </div>
+                {/* Duplicate set for seamless loop */}
+                <div className="flex shrink-0">
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/tommy-hilfiger.jpg" alt="Tommy Hilfiger" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/walmart-logo.png" alt="Walmart" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Ray-Ban_logo.png" alt="Ray-Ban" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/shop-disney-logo.png" alt="Disney" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/The-Fourth-Nike-Logo-Evolution-1971-–-now.png" alt="Nike" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Microsoft logo.png" alt="Microsoft" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/puma-black-logo-png-701751694774568gw2on2y0un.png" alt="Puma" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/adidas logo.png" alt="Adidas" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/ready-edit-nordstrom-logo-transparent-2.png" alt="Nordstrom" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Zara_Logo-new.png" alt="Zara" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/carters-logo-120x120.png" alt="Carter's" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                  <div className="h-16 w-32 relative flex-shrink-0 mx-4">
+                    <Image src="/assets/logos/Prada-Symbol.png" alt="Prada" fill className="object-contain hover:scale-110 transition-all duration-300" loading="lazy" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Search Results Section */}
       {(searchResults.length > 0 || capturedProducts.length > 0 || isLoading || searchError || showUnsupportedMessage) && (
         <section className="py-12 bg-gray-50 border-t border-gray-200">

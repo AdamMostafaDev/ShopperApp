@@ -37,3 +37,30 @@ body {
   font-weight: 100;
   margin-left: 2px;
 }
+
+/* Brand carousel scroll animations */
+@keyframes scroll-left {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes scroll-right {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0%); }
+}
+
+.animate-scroll-left {
+  animation: scroll-left 35s linear infinite;
+  will-change: transform;
+}
+
+.animate-scroll-right {
+  animation: scroll-right 35s linear infinite;
+  will-change: transform;
+}
+
+/* Smooth transition at restart */
+.animate-scroll-left:hover,
+.animate-scroll-right:hover {
+  animation-play-state: paused;
+}
