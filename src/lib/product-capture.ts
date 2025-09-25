@@ -33,7 +33,7 @@ export function extractProductIdFromUrl(url: string): string | null {
 
 export function detectStore(url: string): 'amazon' | 'walmart' | 'ebay' | null {
   const hostname = new URL(url).hostname.toLowerCase();
-  
+
   if (hostname.includes('amazon.')) {
     return 'amazon';
   } else if (hostname.includes('walmart.')) {
@@ -41,7 +41,7 @@ export function detectStore(url: string): 'amazon' | 'walmart' | 'ebay' | null {
   } else if (hostname.includes('ebay.')) {
     return 'ebay';
   }
-  
+
   return null;
 }
 
@@ -57,21 +57,16 @@ export function isAmazonLink(url: string): boolean {
 export async function captureProductFromUrl(url: string): Promise<ProductCaptureResult> {
   try {
     const store = detectStore(url);
-    
-    if (!store) {
+
+    // Only restrict Walmart and eBay for now (they're not fully implemented)
+    if (store === 'walmart' || store === 'ebay') {
       return {
         success: false,
         error: 'This link is not supported as of yet. Please reach out to contact for assistance.'
       };
     }
 
-    // Only allow Amazon for now
-    if (store !== 'amazon') {
-      return {
-        success: false,
-        error: 'This link is not supported as of yet. Please reach out to contact for assistance.'
-      };
-    }
+    // Amazon and non-partner stores (like Nike) are allowed
 
     // Use the real web scraping API
     const response = await fetch('/api/capture-product', {
@@ -115,9 +110,21 @@ export async function captureProductFromUrl(url: string): Promise<ProductCapture
       reviewCount: scrapedProduct.reviewCount || 0,
       url: scrapedProduct.url,
       store: scrapedProduct.store,
+      storeName: scrapedProduct.storeName,
       description: scrapedProduct.description || 'Product captured from ' + store,
       features: scrapedProduct.features,
-      availability: scrapedProduct.availability
+      availability: scrapedProduct.availability,
+
+      // Approval and editing flow
+      requiresApproval: scrapedProduct.requiresApproval || false,
+      isEditable: scrapedProduct.isEditable || false,
+      extractionStatus: scrapedProduct.extractionStatus || 'complete',
+      missingFields: scrapedProduct.missingFields || [],
+      extractionDetails: scrapedProduct.extractionDetails || {
+        titleConfidence: 1.0,
+        priceConfidence: 1.0,
+        imageConfidence: 1.0
+      }
     };
     console.log('✅ Transformed product, weight:', product.weight, 'kg');
 

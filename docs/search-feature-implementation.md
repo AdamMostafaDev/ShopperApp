@@ -141,32 +141,135 @@ URL Input
 - Some sites with heavy JavaScript may need ScraperAPI premium features
 - Manual review needed for complex product configurations
 
+### ✅ Task 1.4: URL-Based Store Name Parsing
+**Status: Completed**
+
+**Implementation Details:**
+- Created `extractStoreNameFromUrl()` function with comprehensive store name mappings
+- Created `extractStoreNameFromPageTitle()` function for fallback extraction
+- Integrated three-tier fallback system in both universal scrapers
+
+**Key Features:**
+- **URL Extraction:** Robust parsing with 35+ known store mappings (Apple, Best Buy, Nike, etc.)
+- **Smart Domain Parsing:** Handles various URL patterns (www, m, shop prefixes)
+- **Page Title Fallback:** Extracts store name from title tags using common separators
+- **Default Fallback:** Uses "Pending Product Details" when extraction fails
+- **Clean Formatting:** Capitalizes and formats store names properly
+
+**Files Modified:**
+- `/src/app/api/capture-product/route.ts` - Added store name extraction functions and integrated into scrapers
+
 ## Next Phase Tasks (Pending)
 
-### 🔄 Task 1.4: URL-Based Store Name Parsing
-- Implement robust store name extraction from URLs
-- Fallback to page title parsing
-- Default to "Pending Product Details" when unavailable
+### ✅ Task 1.5: Advanced Image Fallback System
+**Status: Completed**
 
-### 🔄 Task 1.5: Advanced Image Fallback System
-- OpenGraph image extraction (partially implemented)
-- Store logo database creation
-- Generic product image fallback
+**Implementation Details:**
+- Created comprehensive 4-tier image fallback hierarchy
+- Added `getStoreLogoMapping()` function with 30+ store logo mappings
+- Created generic product SVG fallback image
+- Integrated fallback system into both ScraperAPI and HTML fallback scrapers
 
-### 🔄 Task 1.6: Price Fallback Mechanisms
-- Enhanced price detection algorithms
-- Currency symbol recognition improvements
-- Price validation and error handling
+**Image Fallback Hierarchy:**
+1. **Product Image:** Primary extraction from page selectors and meta tags
+2. **OpenGraph Image:** Meta property og:image and Twitter card images
+3. **Store Logo:** Mapped logos for 30+ major retailers (Apple, Nike, Best Buy, etc.)
+4. **Generic Fallback:** Custom SVG placeholder for unknown stores
 
-### 🔄 Task 1.7: Cart Approval Flow
-- User approval system for non-partner products
-- Inline editing capabilities for product details
-- Price confirmation workflow
+**Key Features:**
+- **Logo Mappings:** Domain-based and store name-based matching
+- **URL Normalization:** Handles relative URLs and protocol-less URLs
+- **Comprehensive Coverage:** Major retailers, fashion brands, tech companies
+- **Graceful Degradation:** Always provides a valid image URL
 
-### 🔄 Task 1.8: No Information Fallback
-- Graceful handling when no product data found
-- User-friendly error messages
-- Alternative action suggestions
+**Files Modified:**
+- `/src/app/api/capture-product/route.ts` - Added logo mapping function and fallback logic
+- `/public/assets/images/generic-product.svg` - Created generic product placeholder
+
+### ✅ Task 1.6: Price Fallback Mechanisms
+**Status: Completed**
+
+**Implementation Details:**
+- Created comprehensive 5-tier price extraction hierarchy with confidence scoring
+- Enhanced `parsePriceFromScrapedText()` with better currency symbol handling
+- Added `extractPriceWithAdvancedPatterns()` for regex-based text pattern matching
+- Implemented `validatePrice()` with currency-specific price range validation
+
+**Price Fallback Hierarchy:**
+1. **Meta Tags:** OpenGraph and product schema price metadata (90% confidence)
+2. **JSON-LD:** Structured data from e-commerce schemas (85% confidence)
+3. **Standard Selectors:** CSS class and attribute-based price selectors (70% confidence)
+4. **Advanced Patterns:** Regex pattern matching on full page content (30-60% confidence)
+5. **Validation:** Currency-specific range validation with detailed error reporting
+
+**Key Features:**
+- **Multi-Currency Support:** USD, GBP, EUR, CAD, AUD, BDT symbol detection
+- **Pattern Confidence:** High/medium/low confidence scoring for price accuracy
+- **Price Validation:** Range validation (e.g., USD: $0.01-$100,000)
+- **Comprehensive Logging:** Detailed extraction process logging for debugging
+- **Fallback Resilience:** Graceful degradation through multiple extraction methods
+
+**Files Modified:**
+- `/src/lib/currency.ts` - Added advanced pattern matching and validation functions
+- `/src/app/api/capture-product/route.ts` - Integrated comprehensive price fallback in both scrapers
+
+### ✅ Task 1.7: Cart Approval Flow
+**Status: Completed**
+
+**Implementation Details:**
+- Extended `ScrapedProduct` interface with approval and editing metadata
+- Created comprehensive product evaluation system with confidence scoring
+- Implemented approval requirement logic (partner vs non-partner stores)
+- Built dedicated API endpoints for product updates and approvals
+
+**Key Features:**
+- **Approval Requirements:** Non-partner products require user approval before cart addition
+- **Inline Editing API:** `/api/update-product` endpoint for modifying product details
+- **Approval Management:** `/api/approve-product` endpoint for approval/rejection workflow
+- **Validation System:** Comprehensive validation for edited product details
+- **Confidence Scoring:** Title, price, and image extraction confidence tracking
+
+**Approval Logic:**
+- **Amazon/eBay/Walmart:** Auto-approved, not editable (high trust)
+- **Other Stores:** Require approval, fully editable by users
+- **Extraction Status:** Complete/Partial/Minimal/Failed classification
+- **Missing Fields Tracking:** Clear indication of what data couldn't be extracted
+
+**Files Modified:**
+- `/src/app/api/capture-product/route.ts` - Added approval logic and evaluation functions
+- `/src/app/api/update-product/route.ts` - New endpoint for inline product editing
+- `/src/app/api/approve-product/route.ts` - New endpoint for product approval management
+
+### ✅ Task 1.8: No Information Fallback
+**Status: Completed**
+
+**Implementation Details:**
+- Created `generateProductFallback()` function for failed extraction scenarios
+- Enhanced error handling with graceful degradation to manual entry mode
+- Implemented comprehensive fallback product generation with minimal viable data
+
+**Fallback Hierarchy:**
+1. **Complete Extraction:** Title, price, image successfully extracted
+2. **Partial Extraction:** Some fields missing, requires user approval and editing
+3. **Minimal Extraction:** Basic store info only, extensive user input needed
+4. **Failed Extraction:** Fallback product with store logo/generic image, manual entry required
+
+**Key Features:**
+- **Fallback Product Generation:** Creates editable product template when all scraping fails
+- **Store Name Extraction:** Attempts to derive store name from URL for fallback
+- **Generic Assets:** Uses store logos or generic product images as fallbacks
+- **Manual Entry Support:** Full editing capabilities for completely failed extractions
+- **User-Friendly Messaging:** Clear indication of what requires manual input
+
+**Error Handling:**
+- **Graceful Degradation:** Never returns complete failure, always provides editable template
+- **Detailed Logging:** Comprehensive extraction attempt logging for debugging
+- **User Guidance:** Clear indication of missing fields and editing requirements
+- **Fallback Chain:** Multiple fallback attempts before generating manual entry template
+
+**Files Modified:**
+- `/src/app/api/capture-product/route.ts` - Added fallback generation and enhanced error handling
+- Extended evaluation functions to handle failed extraction scenarios
 
 ## Performance Considerations
 
@@ -227,6 +330,41 @@ URL Input
 
 ---
 
-**Last Updated:** 2025-09-23
-**Version:** 1.1
-**Status:** Phase 0 Tasks 1.1-1.4 Complete (UI Enhancement Added)
+### ✅ Task 1.9: Nike URL Support Fix
+**Status: Completed**
+
+**Implementation Details:**
+- Fixed frontend URL blocking issue that was preventing Nike URLs from reaching the backend API
+- Updated `captureProductFromUrl()` function to allow non-partner stores (like Nike) to proceed to universal scraper
+- Configured Next.js image domains to support Nike's static image CDN
+
+**Problem Identified:**
+- Backend API already had full Nike support through universal scraper and store logo mappings
+- Frontend `product-capture.ts` was incorrectly blocking Nike URLs before they reached the backend
+- Next.js image configuration was missing Nike's image domain (`static.nike.com`)
+
+**Solution Implemented:**
+- **Frontend Fix:** Modified URL detection logic to allow Amazon and non-partner stores, only restricting Walmart/eBay (not fully implemented)
+- **Image Configuration:** Added comprehensive `remotePatterns` for Nike, Amazon, Walmart, eBay, and wildcard for other scraped images
+- **Universal Support:** Nike URLs now properly flow through the universal scraper with store logo and full extraction capabilities
+
+**Key Changes:**
+- Updated `detectStore()` function logic to allow non-partner stores through to backend
+- Added Nike-specific image domain support in `next.config.ts`
+- Removed Amazon-only restriction that was blocking other supported stores
+- Nike products now correctly show Nike logo and require approval (as intended for non-partner stores)
+
+**Files Modified:**
+- `/src/lib/product-capture.ts` - Updated URL detection and approval logic
+- `/next.config.ts` - Added comprehensive image domain configuration
+
+**User Experience:**
+- Nike URLs now work seamlessly with product title, price, and image extraction
+- Products show Nike logo and require user approval before cart addition
+- Eliminates "This link is not supported" error for Nike and similar stores
+
+---
+
+**Last Updated:** 2025-09-24
+**Version:** 1.6
+**Status:** Phase 0 Tasks 1.1-1.9 Complete (Nike URL Support & Image Configuration Fixed)

@@ -24,6 +24,7 @@ import { captureProductFromUrl, isAmazonLink } from '@/lib/product-capture';
 import { ERROR_MESSAGES } from '@/lib/error-messages';
 import { formatBdtPrice } from '@/lib/currency';
 import Image from 'next/image';
+import ProductPreview from '@/components/ProductPreview';
 
 // Dynamic live activity data pools
 const customerNames = [
@@ -129,6 +130,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [capturedProducts, setCapturedProducts] = useState<Product[]>([]);
+  const [productsForReview, setProductsForReview] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [showUnsupportedMessage, setShowUnsupportedMessage] = useState(false);
@@ -253,31 +255,30 @@ export default function Home() {
 
     // Check if input is a URL
     if (isUrl(query)) {
-      // Check if it's an Amazon link
-      if (!isAmazonLink(query)) {
-        setShowUnsupportedMessage(true);
-        setSearchResults([]);
-        setCapturedProducts([]);
-        setIsLoading(false);
-        return;
-      }
-
-      // Handle Amazon link capture only
+      // Handle product URL capture (Amazon and non-Amazon)
       try {
         const result = await captureProductFromUrl(query);
 
         if (result.success && result.product) {
-          setCapturedProducts(prev => [result.product!, ...prev]);
+          // Check if product requires approval (non-Amazon products)
+          if (result.product.requiresApproval) {
+            setProductsForReview(prev => [result.product!, ...prev]);
+          } else {
+            // Amazon products go directly to captured products
+            setCapturedProducts(prev => [result.product!, ...prev]);
+          }
           setSearchResults([]);
         } else {
           setSearchError(result.error || ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED);
           setSearchResults([]);
           setCapturedProducts([]);
+          setProductsForReview([]);
         }
       } catch (error) {
         setSearchError('An unexpected error occurred while capturing the product');
         setSearchResults([]);
         setCapturedProducts([]);
+        setProductsForReview([]);
       }
     } else {
       // Handle Amazon search
@@ -317,6 +318,17 @@ export default function Home() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     await handleSearchOrCapture(searchQuery);
+  };
+
+  const handleProductApproval = (approvedProduct: Product) => {
+    // Move product from review to captured products
+    setProductsForReview(prev => prev.filter(p => p.id !== approvedProduct.id));
+    setCapturedProducts(prev => [approvedProduct, ...prev]);
+  };
+
+  const handleProductRejection = (productId: string) => {
+    // Remove product from review list
+    setProductsForReview(prev => prev.filter(p => p.id !== productId));
   };
 
   const renderStars = (rating: number) => {
@@ -368,7 +380,7 @@ export default function Home() {
         {product.title}
       </h3>
 
-      {product.rating > 0 && (
+      {product.rating && product.rating > 0 && (
         <div className="flex items-center mb-2">
           <div className="flex items-center">
             {renderStars(product.rating)}
@@ -728,7 +740,7 @@ export default function Home() {
       </section>
 
       {/* Search Results Section */}
-      {(searchResults.length > 0 || capturedProducts.length > 0 || isLoading || searchError || showUnsupportedMessage) && (
+      {(searchResults.length > 0 || capturedProducts.length > 0 || productsForReview.length > 0 || isLoading || searchError || showUnsupportedMessage) && (
         <section className="py-12 bg-gray-50 border-t border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Error Messages */}
@@ -790,17 +802,20 @@ export default function Home() {
             )}
 
             {/* Results Header */}
-            {!isLoading && (searchResults.length > 0 || capturedProducts.length > 0) && (
+            {!isLoading && (searchResults.length > 0 || capturedProducts.length > 0 || productsForReview.length > 0) && (
               <div className="mb-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900">
-                      {capturedProducts.length > 0 ? 'Product Captured' : 'Search Results'}
+                      {productsForReview.length > 0 ? 'Product Review Required' :
+                       capturedProducts.length > 0 ? 'Product Captured' : 'Search Results'}
                     </h2>
                     <p className="text-gray-600 mt-1">
-                      {capturedProducts.length > 0 ?
-                        `${capturedProducts.length} product${capturedProducts.length > 1 ? 's' : ''} ready to add to cart` :
-                        `Found ${searchResults.length} products matching your search`
+                      {productsForReview.length > 0 ?
+                        `${productsForReview.length} product${productsForReview.length > 1 ? 's' : ''} need${productsForReview.length === 1 ? 's' : ''} your review` :
+                        capturedProducts.length > 0 ?
+                          `${capturedProducts.length} product${capturedProducts.length > 1 ? 's' : ''} ready to add to cart` :
+                          `Found ${searchResults.length} products matching your search`
                       }
                     </p>
                   </div>
@@ -813,9 +828,18 @@ export default function Home() {
               </div>
             )}
 
-            {/* Results Grid */}
-            {!isLoading && (searchResults.length > 0 || capturedProducts.length > 0) && (
+            {/* Unified Products Grid */}
+            {!isLoading && (searchResults.length > 0 || capturedProducts.length > 0 || productsForReview.length > 0) && (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {/* Show products requiring review */}
+                {productsForReview.map((product) => (
+                  <ProductPreview
+                    key={product.id}
+                    product={product}
+                    onApprove={handleProductApproval}
+                    onReject={handleProductRejection}
+                  />
+                ))}
                 {/* Show captured products */}
                 {capturedProducts.map((product) => (
                   <ProductCard key={product.id} product={product} />

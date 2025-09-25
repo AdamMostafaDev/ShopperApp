@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400" fill="none">
+  <!-- Background -->
+  <rect width="400" height="400" fill="#f8f9fa"/>
+
+  <!-- Box outline -->
+  <rect x="80" y="120" width="240" height="180" stroke="#6c757d" stroke-width="2" fill="#e9ecef" rx="8"/>
+
+  <!-- Box top -->
+  <path d="M80 120 L200 80 L320 120 L200 140 Z" fill="#dee2e6" stroke="#6c757d" stroke-width="2"/>
+
+  <!-- Box side -->
+  <path d="M320 120 L320 300 L200 340 L200 140 Z" fill="#ced4da" stroke="#6c757d" stroke-width="2"/>
+
+  <!-- Shopping tag icon -->
+  <circle cx="280" cy="160" r="16" fill="#6c757d"/>
+  <circle cx="280" cy="160" r="4" fill="#fff"/>
+
+  <!-- Text -->
+  <text x="200" y="380" text-anchor="middle" fill="#6c757d" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="500">
+    Product Image
+  </text>
+</svg>

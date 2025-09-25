@@ -211,8 +211,144 @@ export function formatPriceWithOriginal(bdtPrice: number, originalPrice: number,
 }
 
 export function parsePriceFromScrapedText(priceText: string): number {
-  const cleanPrice = priceText.replace(/[৳$£€,]/g, '').replace(/[^0-9.]/g, '');
+  if (!priceText || typeof priceText !== 'string') return 0;
+
+  // Remove currency symbols and other non-numeric chars, but keep decimal points
+  const cleanPrice = priceText.replace(/[৳$£€¥₹¢₽₩₪₴₨C\s,]/g, '').replace(/[^0-9.]/g, '');
   return parseFloat(cleanPrice) || 0;
+}
+
+export function extractPriceWithAdvancedPatterns(pageContent: string, currency: string = 'USD'): { price: number; confidence: number } {
+  if (!pageContent) return { price: 0, confidence: 0 };
+
+  const results: { price: number; confidence: number }[] = [];
+
+  // Currency symbol mapping
+  const currencySymbols = {
+    'USD': ['$', 'USD', '\\$'],
+    'GBP': ['£', 'GBP', '\\£'],
+    'EUR': ['€', 'EUR', '\\€'],
+    'CAD': ['C\\$', 'CAD'],
+    'AUD': ['A\\$', 'AUD'],
+    'BDT': ['৳', 'BDT', 'Tk', 'Taka']
+  };
+
+  const symbols = currencySymbols[currency as keyof typeof currencySymbols] || currencySymbols.USD;
+
+  // High confidence patterns (specific e-commerce patterns)
+  const highConfidencePatterns = [
+    // Price with currency symbol before: $19.99, £25.50
+    new RegExp(`(?:${symbols.join('|')})\\s*([0-9]{1,6}(?:,[0-9]{3})*(?:\\.[0-9]{2})?)`, 'gi'),
+    // Price with currency after: 19.99 USD, 25.50 GBP
+    new RegExp(`([0-9]{1,6}(?:,[0-9]{3})*(?:\\.[0-9]{2})?)\\s*(?:${symbols.join('|')})`, 'gi'),
+    // Price in quotes or spans: "$19.99", "25.50 USD"
+    new RegExp(`["'](?:${symbols.join('|')})\\s*([0-9]{1,6}(?:,[0-9]{3})*(?:\\.[0-9]{2})?)["']`, 'gi'),
+    new RegExp(`["']([0-9]{1,6}(?:,[0-9]{3})*(?:\\.[0-9]{2})?)\\s*(?:${symbols.join('|')})["']`, 'gi')
+  ];
+
+  // Medium confidence patterns
+  const mediumConfidencePatterns = [
+    // Price: $19.99, Cost: $25.00
+    new RegExp(`(?:price|cost|amount|total|subtotal)\\s*[:\-]?\\s*(?:${symbols.join('|')})\\s*([0-9]{1,6}(?:,[0-9]{3})*(?:\\.[0-9]{2})?)`, 'gi'),
+    // $19.99 each, $25.00 per item
+    new RegExp(`(?:${symbols.join('|')})\\s*([0-9]{1,6}(?:,[0-9]{3})*(?:\\.[0-9]{2})?)\\s*(?:each|per|ea\\.|/ea)`, 'gi')
+  ];
+
+  // Low confidence patterns (basic number detection)
+  const lowConfidencePatterns = [
+    // Any currency symbol followed by numbers
+    new RegExp(`(?:${symbols.join('|')})\\s*([0-9]{1,4}(?:,[0-9]{3})*(?:\\.[0-9]{2})?)`, 'gi')
+  ];
+
+  // Process high confidence patterns
+  highConfidencePatterns.forEach(pattern => {
+    const matches = [...pageContent.matchAll(pattern)];
+    matches.forEach(match => {
+      const priceStr = match[1];
+      if (priceStr) {
+        const price = parsePriceFromScrapedText(priceStr);
+        if (price > 0 && price < 1000000) { // Reasonable price range
+          results.push({ price, confidence: 0.9 });
+        }
+      }
+    });
+  });
+
+  // If no high confidence results, try medium confidence
+  if (results.length === 0) {
+    mediumConfidencePatterns.forEach(pattern => {
+      const matches = [...pageContent.matchAll(pattern)];
+      matches.forEach(match => {
+        const priceStr = match[1];
+        if (priceStr) {
+          const price = parsePriceFromScrapedText(priceStr);
+          if (price > 0 && price < 1000000) {
+            results.push({ price, confidence: 0.6 });
+          }
+        }
+      });
+    });
+  }
+
+  // If still no results, try low confidence
+  if (results.length === 0) {
+    lowConfidencePatterns.forEach(pattern => {
+      const matches = [...pageContent.matchAll(pattern)];
+      matches.forEach(match => {
+        const priceStr = match[1];
+        if (priceStr) {
+          const price = parsePriceFromScrapedText(priceStr);
+          if (price > 0 && price < 1000000) {
+            results.push({ price, confidence: 0.3 });
+          }
+        }
+      });
+    });
+  }
+
+  if (results.length === 0) {
+    return { price: 0, confidence: 0 };
+  }
+
+  // Return the result with highest confidence, or most common price if tied
+  const sortedResults = results.sort((a, b) => b.confidence - a.confidence);
+  return sortedResults[0];
+}
+
+export function validatePrice(price: number, currency: string = 'USD'): { isValid: boolean; reason?: string } {
+  if (typeof price !== 'number' || isNaN(price)) {
+    return { isValid: false, reason: 'Invalid number' };
+  }
+
+  if (price < 0) {
+    return { isValid: false, reason: 'Negative price' };
+  }
+
+  if (price === 0) {
+    return { isValid: true }; // 0 is valid for free products
+  }
+
+  // Currency-specific validation ranges
+  const priceRanges = {
+    'USD': { min: 0.01, max: 100000 },
+    'GBP': { min: 0.01, max: 80000 },
+    'EUR': { min: 0.01, max: 90000 },
+    'CAD': { min: 0.01, max: 130000 },
+    'AUD': { min: 0.01, max: 150000 },
+    'BDT': { min: 1, max: 10000000 }
+  };
+
+  const range = priceRanges[currency as keyof typeof priceRanges] || priceRanges.USD;
+
+  if (price < range.min) {
+    return { isValid: false, reason: `Price too low (min: ${range.min} ${currency})` };
+  }
+
+  if (price > range.max) {
+    return { isValid: false, reason: `Price too high (max: ${range.max} ${currency})` };
+  }
+
+  return { isValid: true };
 }
 
 export function detectCurrency(priceText: string): keyof ExchangeRates | 'BDT' {

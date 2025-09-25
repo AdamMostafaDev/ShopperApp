@@ -1000,11 +1000,11 @@ export default function AdminOrdersPage() {
         }
         result = await response.json();
       } catch (e) {
-        if (e.message.startsWith('HTTP')) {
+        if (e instanceof Error && e.message.startsWith('HTTP')) {
           throw e; // Re-throw HTTP errors
         }
         // This is a JSON parsing error
-        throw new Error(`Failed to parse response as JSON: ${e.message}`);
+        throw new Error(`Failed to parse response as JSON: ${e instanceof Error ? e.message : 'Unknown error'}`);
       }
 
       if (!result.success) {
@@ -1085,11 +1085,11 @@ export default function AdminOrdersPage() {
         }
         result = await response.json();
       } catch (e) {
-        if (e.message.startsWith('HTTP')) {
+        if (e instanceof Error && e.message.startsWith('HTTP')) {
           throw e; // Re-throw HTTP errors
         }
         // This is a JSON parsing error
-        throw new Error(`Failed to parse response as JSON: ${e.message}`);
+        throw new Error(`Failed to parse response as JSON: ${e instanceof Error ? e.message : 'Unknown error'}`);
       }
 
       if (!result.success) {

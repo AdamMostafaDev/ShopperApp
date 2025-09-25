@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import UserAgent from 'user-agents';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { parsePriceFromScrapedText, convertToBdt, detectCurrency, isBdtPrice } from '@/lib/currency';
+import { parsePriceFromScrapedText, convertToBdt, detectCurrency, isBdtPrice, extractPriceWithAdvancedPatterns, validatePrice } from '@/lib/currency';
 
 interface ScrapedProduct {
   title: string;
@@ -19,11 +19,22 @@ interface ScrapedProduct {
   availability: 'in_stock' | 'out_of_stock' | 'limited';
   store: 'amazon' | 'walmart' | 'ebay' | 'other';
   storeName?: string; // Store name for non-partner sites
+
+  // Approval and editing flow
+  requiresApproval: boolean; // True for non-partner products
+  isEditable: boolean; // True if user can edit product details
+  extractionStatus: 'complete' | 'partial' | 'minimal' | 'failed';
+  missingFields: string[]; // Fields that couldn't be extracted
+  extractionDetails: {
+    titleConfidence: number;
+    priceConfidence: number;
+    imageConfidence: number;
+  };
 }
 
 function detectStore(url: string): 'amazon' | 'walmart' | 'ebay' | null {
   const hostname = new URL(url).hostname.toLowerCase();
-  
+
   if (hostname.includes('amazon.')) {
     return 'amazon';
   } else if (hostname.includes('walmart.')) {
@@ -31,8 +42,353 @@ function detectStore(url: string): 'amazon' | 'walmart' | 'ebay' | null {
   } else if (hostname.includes('ebay.')) {
     return 'ebay';
   }
-  
+
   return null;
+}
+
+function extractStoreNameFromUrl(url: string): string | null {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+
+    // Remove common prefixes
+    let cleanHostname = hostname.replace(/^(www\.|m\.|shop\.|store\.|buy\.)/i, '');
+
+    // Handle special cases for known stores
+    const storeNameMappings: { [key: string]: string } = {
+      'apple.com': 'Apple',
+      'bestbuy.com': 'Best Buy',
+      'target.com': 'Target',
+      'homedepot.com': 'Home Depot',
+      'lowes.com': 'Lowes',
+      'costco.com': 'Costco',
+      'samsclub.com': 'Sams Club',
+      'newegg.com': 'Newegg',
+      'bhphotovideo.com': 'B&H Photo',
+      'adorama.com': 'Adorama',
+      'microcenter.com': 'Micro Center',
+      'officedepot.com': 'Office Depot',
+      'staples.com': 'Staples',
+      'nike.com': 'Nike',
+      'adidas.com': 'Adidas',
+      'underarmour.com': 'Under Armour',
+      'macys.com': 'Macys',
+      'nordstrom.com': 'Nordstrom',
+      'sephora.com': 'Sephora',
+      'ulta.com': 'Ulta Beauty',
+      'zara.com': 'Zara',
+      'hm.com': 'H&M',
+      'forever21.com': 'Forever 21',
+      'gap.com': 'Gap',
+      'oldnavy.com': 'Old Navy',
+      'bananarepublic.com': 'Banana Republic',
+      'uniqlo.com': 'Uniqlo',
+      'ikea.com': 'IKEA',
+      'wayfair.com': 'Wayfair',
+      'overstock.com': 'Overstock',
+      'etsy.com': 'Etsy',
+      'alibaba.com': 'Alibaba',
+      'aliexpress.com': 'AliExpress',
+      'wish.com': 'Wish',
+      'shein.com': 'SHEIN',
+      'asos.com': 'ASOS'
+    };
+
+    // Check if it's a known store
+    for (const [domain, name] of Object.entries(storeNameMappings)) {
+      if (cleanHostname.includes(domain)) {
+        return name;
+      }
+    }
+
+    // For unknown stores, extract the main part of the domain
+    const domainParts = cleanHostname.split('.');
+
+    // Handle different TLD structures (.com, .co.uk, .com.au, etc.)
+    let storeName = domainParts[0];
+
+    // Filter out generic TLDs and country codes
+    const genericParts = ['com', 'net', 'org', 'co', 'uk', 'au', 'ca', 'de', 'fr', 'jp', 'in', 'cn'];
+    if (genericParts.includes(storeName.toLowerCase()) && domainParts.length > 2) {
+      // If the first part is generic, try the subdomain
+      const subdomain = hostname.split('.')[0];
+      if (!['www', 'm', 'shop', 'store'].includes(subdomain)) {
+        storeName = subdomain;
+      }
+    }
+
+    // Capitalize and clean up the store name
+    storeName = storeName
+      .replace(/[-_]/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+
+    // Return null if we end up with a generic name
+    if (['Www', 'Shop', 'Store', 'M'].includes(storeName)) {
+      return null;
+    }
+
+    return storeName;
+  } catch (e) {
+    console.error('Error extracting store name from URL:', e);
+    return null;
+  }
+}
+
+function extractStoreNameFromPageTitle(pageTitle: string, url: string): string | null {
+  try {
+    if (!pageTitle || pageTitle.trim() === '') {
+      return null;
+    }
+
+    // Common patterns in page titles
+    // "Product Name - Store Name"
+    // "Product Name | Store Name"
+    // "Store Name: Product Name"
+    // "Product Name at Store Name"
+    // "Buy Product Name - Store Name"
+
+    // Try to extract after common separators
+    const separators = [' - ', ' | ', ' – ', ' — ', ' :: ', ' at ', ' from '];
+
+    for (const separator of separators) {
+      if (pageTitle.includes(separator)) {
+        const parts = pageTitle.split(separator);
+
+        // Usually store name is at the end
+        const lastPart = parts[parts.length - 1].trim();
+
+        // Filter out common suffixes
+        const cleanedPart = lastPart
+          .replace(/\s*(Online Store|Shop|Store|Official Site|Official Store|\.com|\.net|\.org)$/i, '')
+          .trim();
+
+        // Check if it's not too long (store names are usually short)
+        if (cleanedPart.length > 0 && cleanedPart.length < 30 && !cleanedPart.includes(' - ')) {
+          return cleanedPart;
+        }
+
+        // Try the first part if it looks like a store name
+        const firstPart = parts[0].trim();
+        if (firstPart.length < 30 && !firstPart.toLowerCase().includes('buy') &&
+            !firstPart.toLowerCase().includes('shop') && !firstPart.toLowerCase().includes('product')) {
+          return firstPart;
+        }
+      }
+    }
+
+    // If no separator found, check if the whole title is short enough to be a store name
+    const cleanTitle = pageTitle
+      .replace(/\s*(Online Store|Shop|Store|Official Site|Official Store)$/i, '')
+      .trim();
+
+    if (cleanTitle.length < 30 && cleanTitle.split(' ').length <= 4) {
+      return cleanTitle;
+    }
+
+    return null;
+  } catch (e) {
+    console.error('Error extracting store name from page title:', e);
+    return null;
+  }
+}
+
+function evaluateProductExtraction(
+  title: string,
+  price: number,
+  image: string,
+  titleConfidence: number,
+  priceConfidence: number,
+  imageConfidence: number
+): {
+  extractionStatus: 'complete' | 'partial' | 'minimal' | 'failed';
+  missingFields: string[];
+} {
+  const missingFields: string[] = [];
+  let extractedCount = 0;
+
+  // Check title
+  if (!title || title === 'Pending Product Details' || title.length < 3) {
+    missingFields.push('title');
+  } else {
+    extractedCount++;
+  }
+
+  // Check price
+  if (price <= 0) {
+    missingFields.push('price');
+  } else {
+    extractedCount++;
+  }
+
+  // Check image
+  if (!image || image === '/assets/images/generic-product.svg') {
+    missingFields.push('image');
+  } else if (image.includes('/assets/logos/')) {
+    // Store logo is better than generic, but not ideal
+    extractedCount += 0.5;
+  } else {
+    extractedCount++;
+  }
+
+  // Determine extraction status
+  let extractionStatus: 'complete' | 'partial' | 'minimal' | 'failed';
+
+  if (extractedCount >= 3) {
+    extractionStatus = 'complete';
+  } else if (extractedCount >= 2) {
+    extractionStatus = 'partial';
+  } else if (extractedCount >= 1) {
+    extractionStatus = 'minimal';
+  } else {
+    extractionStatus = 'failed';
+  }
+
+  return { extractionStatus, missingFields };
+}
+
+function determineApprovalRequirement(
+  store: 'amazon' | 'walmart' | 'ebay' | 'other',
+  extractionStatus: 'complete' | 'partial' | 'minimal' | 'failed'
+): { requiresApproval: boolean; isEditable: boolean } {
+  // Partner stores (Amazon, eBay, Walmart) generally don't require approval
+  if (store === 'amazon' || store === 'ebay' || store === 'walmart') {
+    return {
+      requiresApproval: false,
+      isEditable: false // Partner products are usually accurate
+    };
+  }
+
+  // Non-partner stores require approval, especially if extraction is incomplete
+  return {
+    requiresApproval: true,
+    isEditable: true // Allow editing for non-partner products
+  };
+}
+
+function generateProductFallback(url: string, storeName: string): ScrapedProduct {
+  console.log('🔄 Generating fallback product for failed extraction');
+
+  const fallbackTitle = `Product from ${storeName}`;
+  const fallbackImage = getStoreLogoMapping(url, storeName) || '/assets/images/generic-product.svg';
+
+  const evaluation = evaluateProductExtraction(fallbackTitle, 0, fallbackImage, 0.3, 0, 0.2);
+  const approval = determineApprovalRequirement('other', evaluation.extractionStatus);
+
+  return {
+    title: fallbackTitle,
+    price: 0,
+    originalCurrency: 'USD',
+    originalPriceValue: 0,
+    image: fallbackImage,
+    availability: 'in_stock',
+    store: 'other',
+    storeName,
+    requiresApproval: approval.requiresApproval,
+    isEditable: approval.isEditable,
+    extractionStatus: evaluation.extractionStatus,
+    missingFields: evaluation.missingFields,
+    extractionDetails: {
+      titleConfidence: 0.3, // Generic title
+      priceConfidence: 0,    // No price
+      imageConfidence: fallbackImage.includes('generic') ? 0.2 : 0.5 // Logo or generic
+    }
+  };
+}
+
+function getStoreLogoMapping(url: string, storeName?: string): string | null {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+
+    // Store logo mappings using available assets
+    const storeLogoMappings: { [key: string]: string } = {
+      // Major retailers
+      'apple.com': '/assets/logos/apple-logo.png',
+      'amazon.com': '/assets/logos/amazon_logo.png',
+      'walmart.com': '/assets/logos/walmart-logo.png',
+      'ebay.com': '/assets/logos/ebay-logo.png',
+      'bestbuy.com': '/assets/logos/Best_Buy_Logo.svg.png',
+      'target.com': '/assets/logos/Target_New.png',
+
+      // Fashion & Apparel
+      'nike.com': '/assets/logos/The-Fourth-Nike-Logo-Evolution-1971-–-now.png',
+      'adidas.com': '/assets/logos/adidas logo.png',
+      'puma.com': '/assets/logos/puma-black-logo-png-701751694774568gw2on2y0un.png',
+      'gap.com': '/assets/logos/gap.png',
+      'zara.com': '/assets/logos/Zara_Logo-new.png',
+      'nordstrom.com': '/assets/logos/ready-edit-nordstrom-logo-transparent-2.png',
+      'macys.com': '/assets/logos/macys-logo.png',
+      'sephora.com': '/assets/logos/sephora.png',
+      'ralphlauren.com': '/assets/logos/ralph-lauren-logo.png',
+      'polo.com': '/assets/logos/polo_ralph-lauren_new.png',
+      'tommy.com': '/assets/logos/tommy-hilfiger.jpg',
+      'calvinklein.com': '/assets/logos/CK_Calvin_Klein_logo.png',
+      'louisvuitton.com': '/assets/logos/Louis-Vuitton-logo.png',
+      'prada.com': '/assets/logos/Prada-Symbol.png',
+      'ray-ban.com': '/assets/logos/Ray-Ban_logo.png',
+      'rayban.com': '/assets/logos/Ray-Ban_logo.png',
+
+      // Technology
+      'microsoft.com': '/assets/logos/Microsoft logo.png',
+      'samsung.com': '/assets/logos/Samsung_newer.png',
+      'sony.com': '/assets/logos/sony-2-logo-black-and-white.png',
+      'nintendo.com': '/assets/logos/nintendo-2-logo-png-transparent.png',
+
+      // Entertainment & Media
+      'disney.com': '/assets/logos/shop-disney-logo.png',
+      'disneystore.com': '/assets/logos/shop-disney-logo.png',
+
+      // Beauty & Personal Care
+      'loreal.com': '/assets/logos/l-oreal-logo.png',
+
+      // Kids & Baby
+      'carters.com': '/assets/logos/carters-logo-120x120.png',
+      'cartersoshkosh.com': '/assets/logos/carters-logo-120x120.png'
+    };
+
+    // Check direct domain matches first
+    for (const [domain, logo] of Object.entries(storeLogoMappings)) {
+      if (hostname.includes(domain)) {
+        return logo;
+      }
+    }
+
+    // If no direct match and we have a storeName, try to match by name
+    if (storeName) {
+      const nameToLogoMap: { [key: string]: string } = {
+        'apple': '/assets/logos/apple-logo.png',
+        'amazon': '/assets/logos/amazon_logo.png',
+        'walmart': '/assets/logos/walmart-logo.png',
+        'ebay': '/assets/logos/ebay-logo.png',
+        'best buy': '/assets/logos/Best_Buy_Logo.svg.png',
+        'target': '/assets/logos/Target_New.png',
+        'nike': '/assets/logos/The-Fourth-Nike-Logo-Evolution-1971-–-now.png',
+        'adidas': '/assets/logos/adidas logo.png',
+        'puma': '/assets/logos/puma-black-logo-png-701751694774568gw2on2y0un.png',
+        'gap': '/assets/logos/gap.png',
+        'zara': '/assets/logos/Zara_Logo-new.png',
+        'nordstrom': '/assets/logos/ready-edit-nordstrom-logo-transparent-2.png',
+        'macys': '/assets/logos/macys-logo.png',
+        'sephora': '/assets/logos/sephora.png',
+        'microsoft': '/assets/logos/Microsoft logo.png',
+        'samsung': '/assets/logos/Samsung_newer.png',
+        'sony': '/assets/logos/sony-2-logo-black-and-white.png',
+        'disney': '/assets/logos/shop-disney-logo.png'
+      };
+
+      const normalizedStoreName = storeName.toLowerCase();
+      for (const [name, logo] of Object.entries(nameToLogoMap)) {
+        if (normalizedStoreName.includes(name)) {
+          return logo;
+        }
+      }
+    }
+
+    return null;
+  } catch (e) {
+    console.error('Error getting store logo mapping:', e);
+    return null;
+  }
 }
 
 async function parseAmazonHTML(html: string, originalUrl: string): Promise<any> {
@@ -185,9 +541,7 @@ async function scrapeAmazonWithScraperAPI(url: string): Promise<ScrapedProduct |
         scraperUrl = `https://api.scraperapi.com/?api_key=${apiKey}&url=${encodedUrl}&render=true&wait_for=5&timeout=120000&premium=true&device_type=desktop&session_number=${attempt}&retry_404=true`;
       }
       
-      const response = await fetch(scraperUrl, {
-        timeout: 150000 // Increased timeout to 150 seconds
-      });
+      const response = await fetch(scraperUrl);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -321,6 +675,15 @@ async function scrapeAmazonWithScraperAPI(url: string): Promise<ScrapedProduct |
       console.log('⚠️ No weight found in product data - will use 1kg default for shipping');
     }
     
+    // Amazon products have high confidence and don't require approval
+    const titleConfidence = data.name && data.name.length > 3 ? 0.95 : 0.3;
+    const imageUrl = data.images && data.images.length > 0 ? data.images[0] : '';
+    const imageConfidence = imageUrl ? 0.95 : 0.1;
+    const priceConfidence = originalPriceValue > 0 ? 0.95 : 0;
+
+    const evaluation = evaluateProductExtraction(data.name, bdtPrice, imageUrl, titleConfidence, priceConfidence, imageConfidence);
+    const approval = determineApprovalRequirement('amazon', evaluation.extractionStatus);
+
     // Convert ScraperAPI response to our format
     const product: ScrapedProduct = {
       title: data.name,
@@ -329,14 +692,23 @@ async function scrapeAmazonWithScraperAPI(url: string): Promise<ScrapedProduct |
       originalCurrency: currency,
       originalPriceValue: originalPriceValue,
       weight: weight,
-      image: data.images && data.images.length > 0 ? data.images[0] : '',
+      image: imageUrl,
       rating: data.average_rating ? parseFloat(data.average_rating.toString()) : undefined,
       reviewCount: data.total_reviews ? parseInt(data.total_reviews.toString()) : undefined,
       description: data.feature_bullets && data.feature_bullets.length > 0 ? data.feature_bullets.slice(0, 3).join('. ') : '',
       features: data.feature_bullets || [],
-      availability: data.availability_status === 'In Stock' ? 'in_stock' : 
+      availability: data.availability_status === 'In Stock' ? 'in_stock' :
                    data.availability_status === 'Out of Stock' ? 'out_of_stock' : 'limited',
-      store: 'amazon'
+      store: 'amazon',
+      requiresApproval: approval.requiresApproval,
+      isEditable: approval.isEditable,
+      extractionStatus: evaluation.extractionStatus,
+      missingFields: evaluation.missingFields,
+      extractionDetails: {
+        titleConfidence,
+        priceConfidence,
+        imageConfidence
+      }
     };
 
       console.log('ScraperAPI success:', product.title);
@@ -608,16 +980,6 @@ async function scrapeUniversalWithScraperAPI(url: string): Promise<ScrapedProduc
       const html = await response.text();
       const $ = cheerio.load(html);
 
-      // Extract store name from URL
-      let storeName = '';
-      try {
-        const hostname = new URL(url).hostname;
-        storeName = hostname.replace('www.', '').split('.')[0];
-        storeName = storeName.charAt(0).toUpperCase() + storeName.slice(1);
-      } catch (e) {
-        storeName = 'Online Store';
-      }
-
       // Dynamic title extraction - try multiple common selectors
       let title = '';
       const titleSelectors = [
@@ -662,57 +1024,39 @@ async function scrapeUniversalWithScraperAPI(url: string): Promise<ScrapedProduc
         throw new Error('Could not extract product title');
       }
 
-      // Dynamic price extraction
+      // Comprehensive price extraction with fallback hierarchy
       let originalPriceValue = 0;
       let currency = 'USD';
+      let priceConfidence = 0;
 
-      const priceSelectors = [
-        '[itemprop="price"]',
-        '.price',
-        '.product-price',
-        '.regular-price',
-        '.sale-price',
-        '.current-price',
-        '[data-testid*="price"]',
-        '.amount',
+      console.log('💰 Starting comprehensive price extraction...');
+
+      // Step 1: Meta tags (highest priority)
+      const metaPriceSelectors = [
         'meta[property="product:price:amount"]',
         'meta[property="og:price:amount"]',
-        'span[class*="price"]:not([class*="old"]):not([class*="was"])',
-        'div[class*="price"]:not([class*="old"]):not([class*="was"])',
-        'p[class*="price"]'
+        'meta[itemprop="price"]',
+        'meta[name="price"]'
       ];
 
-      for (const selector of priceSelectors) {
-        if (selector.startsWith('meta')) {
-          const element = $(selector).first();
-          const content = element.attr('content');
-          if (content) {
-            const parsed = parseFloat(content);
-            if (parsed > 0) {
-              originalPriceValue = parsed;
-              // Try to get currency from meta tag
-              const currencyMeta = $('meta[property="product:price:currency"], meta[property="og:price:currency"]').first();
-              if (currencyMeta.attr('content')) {
-                currency = currencyMeta.attr('content');
-              }
-              break;
-            }
-          }
-        } else {
-          const element = $(selector).first();
-          const priceText = element.text().trim() || element.attr('content') || element.attr('data-price');
-          if (priceText) {
-            const parsedPrice = parsePriceFromScrapedText(priceText);
-            if (parsedPrice > 0) {
-              originalPriceValue = parsedPrice;
-              currency = detectCurrency(priceText);
-              break;
-            }
+      for (const selector of metaPriceSelectors) {
+        const element = $(selector).first();
+        const content = element.attr('content');
+        if (content) {
+          const parsed = parseFloat(content);
+          if (parsed > 0) {
+            originalPriceValue = parsed;
+            priceConfidence = 0.9;
+            // Get currency from meta tag
+            const currencyMeta = $('meta[property="product:price:currency"], meta[property="og:price:currency"]').first();
+            currency = currencyMeta.attr('content') || 'USD';
+            console.log(`💰 Meta tag price found: ${originalPriceValue} ${currency} (confidence: ${priceConfidence})`);
+            break;
           }
         }
       }
 
-      // If still no price, try JSON-LD structured data
+      // Step 2: JSON-LD structured data
       if (originalPriceValue <= 0) {
         const jsonLdScripts = $('script[type="application/ld+json"]');
         jsonLdScripts.each((i, script) => {
@@ -723,19 +1067,78 @@ async function scrapeUniversalWithScraperAPI(url: string): Promise<ScrapedProduc
               if (offers.price) {
                 originalPriceValue = parseFloat(offers.price);
                 currency = offers.priceCurrency || 'USD';
+                priceConfidence = 0.85;
+                console.log(`💰 JSON-LD price found: ${originalPriceValue} ${currency} (confidence: ${priceConfidence})`);
+                return false; // Break out of each loop
               }
             }
           } catch (e) {
-            // Invalid JSON, skip
+            // Invalid JSON, continue
           }
         });
       }
 
+      // Step 3: Standard price selectors
       if (originalPriceValue <= 0) {
-        console.log('⚠️ Warning: Could not extract price, will continue with 0');
+        const priceSelectors = [
+          '[itemprop="price"]',
+          '.price:not(.old-price):not(.was-price)',
+          '.product-price:not(.old-price)',
+          '.regular-price',
+          '.sale-price',
+          '.current-price',
+          '[data-testid*="price"]',
+          '.amount',
+          'span[class*="price"]:not([class*="old"]):not([class*="was"])',
+          'div[class*="price"]:not([class*="old"]):not([class*="was"])',
+          'p[class*="price"]'
+        ];
+
+        for (const selector of priceSelectors) {
+          const element = $(selector).first();
+          const priceText = element.text().trim() || element.attr('content') || element.attr('data-price');
+          if (priceText) {
+            const parsedPrice = parsePriceFromScrapedText(priceText);
+            if (parsedPrice > 0) {
+              originalPriceValue = parsedPrice;
+              currency = detectCurrency(priceText);
+              priceConfidence = 0.7;
+              console.log(`💰 Selector price found: ${originalPriceValue} ${currency} (confidence: ${priceConfidence})`);
+              break;
+            }
+          }
+        }
       }
 
-      // Dynamic image extraction
+      // Step 4: Advanced pattern matching on full page content
+      if (originalPriceValue <= 0) {
+        console.log('💰 Trying advanced pattern matching...');
+        const pageText = $.html();
+        const advancedResult = extractPriceWithAdvancedPatterns(pageText, currency);
+        if (advancedResult.price > 0) {
+          originalPriceValue = advancedResult.price;
+          priceConfidence = advancedResult.confidence;
+          console.log(`💰 Advanced pattern price found: ${originalPriceValue} ${currency} (confidence: ${priceConfidence})`);
+        }
+      }
+
+      // Step 5: Validate the extracted price
+      if (originalPriceValue > 0) {
+        const validation = validatePrice(originalPriceValue, currency);
+        if (!validation.isValid) {
+          console.log(`⚠️ Price validation failed: ${validation.reason}`);
+          originalPriceValue = 0;
+          priceConfidence = 0;
+        } else {
+          console.log(`✅ Price validation passed: ${originalPriceValue} ${currency}`);
+        }
+      }
+
+      if (originalPriceValue <= 0) {
+        console.log('⚠️ No valid price found after comprehensive extraction');
+      }
+
+      // Dynamic image extraction with fallback hierarchy
       let image = '';
       const imageSelectors = [
         'meta[property="og:image"]',
@@ -751,6 +1154,7 @@ async function scrapeUniversalWithScraperAPI(url: string): Promise<ScrapedProduc
         'img[src*="product"]'
       ];
 
+      // Step 1: Try to extract product image
       for (const selector of imageSelectors) {
         if (selector.startsWith('meta')) {
           const element = $(selector).first();
@@ -783,6 +1187,31 @@ async function scrapeUniversalWithScraperAPI(url: string): Promise<ScrapedProduc
         }
       }
 
+      // Image fallback hierarchy implementation
+      if (!image) {
+        console.log('⚠️ No product image found, trying fallback options...');
+
+        // Step 2: Try OpenGraph image (already attempted above, but double-check)
+        const ogImage = $('meta[property="og:image"]').attr('content') || $('meta[name="twitter:image"]').attr('content');
+        if (ogImage) {
+          image = ogImage.startsWith('//') ? 'https:' + ogImage : ogImage;
+          console.log('📸 Using OpenGraph image fallback');
+        } else {
+          // Step 3: Try store logo based on URL/storeName
+          const storeLogo = getStoreLogoMapping(url, storeName);
+          if (storeLogo) {
+            image = storeLogo;
+            console.log(`📸 Using store logo fallback: ${storeLogo}`);
+          } else {
+            // Step 4: Final fallback - generic product image
+            image = '/assets/images/generic-product.svg';
+            console.log('📸 Using generic product image fallback');
+          }
+        }
+      } else {
+        console.log('📸 Product image extracted successfully');
+      }
+
       // Convert price to BDT if needed
       let bdtPrice: number = 0;
       if (originalPriceValue > 0) {
@@ -793,7 +1222,42 @@ async function scrapeUniversalWithScraperAPI(url: string): Promise<ScrapedProduc
         }
       }
 
-      console.log(`✅ Universal scraping successful: ${title.substring(0, 50)}...`);
+      // Extract store name with fallback logic
+      let storeName: string = 'Pending Product Details';
+
+      // Step 1: Try to extract from URL
+      const urlStoreName = extractStoreNameFromUrl(url);
+      if (urlStoreName) {
+        storeName = urlStoreName;
+        console.log(`📍 Store name from URL: ${storeName}`);
+      } else {
+        // Step 2: Try to extract from page title
+        const pageTitle = $('title').text().trim() || title;
+        const titleStoreName = extractStoreNameFromPageTitle(pageTitle, url);
+        if (titleStoreName) {
+          storeName = titleStoreName;
+          console.log(`📍 Store name from page title: ${storeName}`);
+        } else {
+          // Step 3: Use default fallback
+          console.log(`⚠️ Could not extract store name, using default: ${storeName}`);
+        }
+      }
+
+      // Evaluate extraction quality and determine approval requirements
+      const titleConfidence = title && title !== 'Pending Product Details' ? 0.8 : 0.3;
+      const imageConfidence = image && !image.includes('generic') && !image.includes('logos') ? 0.8 :
+                              image && image.includes('logos') ? 0.5 : 0.2;
+
+      const evaluation = evaluateProductExtraction(title, bdtPrice, image, titleConfidence, priceConfidence, imageConfidence);
+      const approval = determineApprovalRequirement('other', evaluation.extractionStatus);
+
+      console.log(`✅ Universal scraping successful: ${title.substring(0, 50)}... (Status: ${evaluation.extractionStatus})`);
+      console.log(`🔍 Extraction details: Title confidence: ${titleConfidence}, Price confidence: ${priceConfidence}, Image confidence: ${imageConfidence}`);
+      console.log(`📋 Requires approval: ${approval.requiresApproval}, Editable: ${approval.isEditable}`);
+
+      if (evaluation.missingFields.length > 0) {
+        console.log(`⚠️ Missing fields: ${evaluation.missingFields.join(', ')}`);
+      }
 
       return {
         title,
@@ -803,7 +1267,16 @@ async function scrapeUniversalWithScraperAPI(url: string): Promise<ScrapedProduc
         image,
         availability: 'in_stock',
         store: 'other',
-        storeName
+        storeName,
+        requiresApproval: approval.requiresApproval,
+        isEditable: approval.isEditable,
+        extractionStatus: evaluation.extractionStatus,
+        missingFields: evaluation.missingFields,
+        extractionDetails: {
+          titleConfidence,
+          priceConfidence,
+          imageConfidence
+        }
       };
 
     } catch (error) {
@@ -839,16 +1312,6 @@ async function scrapeUniversalFallback(url: string): Promise<ScrapedProduct | nu
 
     const $ = cheerio.load(response.data);
 
-    // Extract store name from URL
-    let storeName = '';
-    try {
-      const hostname = new URL(url).hostname;
-      storeName = hostname.replace('www.', '').split('.')[0];
-      storeName = storeName.charAt(0).toUpperCase() + storeName.slice(1);
-    } catch (e) {
-      storeName = 'Online Store';
-    }
-
     // Try to extract from OpenGraph tags first (most reliable)
     let title = $('meta[property="og:title"]').attr('content') ||
                $('meta[name="twitter:title"]').attr('content') || '';
@@ -873,28 +1336,35 @@ async function scrapeUniversalFallback(url: string): Promise<ScrapedProduct | nu
       throw new Error('Could not extract product title');
     }
 
-    // Extract price
+    // Comprehensive price extraction with fallback hierarchy (HTML Fallback)
     let originalPriceValue = 0;
     let currency = 'USD';
+    let priceConfidence = 0;
 
-    // Try OpenGraph price first
+    console.log('💰 [HTML Fallback] Starting comprehensive price extraction...');
+
+    // Step 1: OpenGraph/Meta tags (highest priority)
     const ogPrice = $('meta[property="product:price:amount"], meta[property="og:price:amount"]').attr('content');
     if (ogPrice) {
       originalPriceValue = parseFloat(ogPrice);
       const ogCurrency = $('meta[property="product:price:currency"], meta[property="og:price:currency"]').attr('content');
-      if (ogCurrency) {
-        currency = ogCurrency;
-      }
+      currency = ogCurrency || 'USD';
+      priceConfidence = 0.9;
+      console.log(`💰 [HTML Fallback] Meta tag price: ${originalPriceValue} ${currency} (confidence: ${priceConfidence})`);
     }
 
-    // If no OpenGraph price, try regular selectors
+    // Step 2: Standard price selectors
     if (originalPriceValue <= 0) {
       const priceSelectors = [
         '[itemprop="price"]',
         '.price:not(.old-price):not(.was-price)',
-        '.product-price',
+        '.product-price:not(.old-price)',
         '.current-price',
-        'span[class*="price"]:not([class*="old"]):not([class*="was"])'
+        '.regular-price',
+        '.sale-price',
+        'span[class*="price"]:not([class*="old"]):not([class*="was"])',
+        'div[class*="price"]:not([class*="old"]):not([class*="was"])',
+        '[data-testid*="price"]'
       ];
 
       for (const selector of priceSelectors) {
@@ -905,22 +1375,60 @@ async function scrapeUniversalFallback(url: string): Promise<ScrapedProduct | nu
           if (parsedPrice > 0) {
             originalPriceValue = parsedPrice;
             currency = detectCurrency(priceText);
+            priceConfidence = 0.7;
+            console.log(`💰 [HTML Fallback] Selector price: ${originalPriceValue} ${currency} (confidence: ${priceConfidence})`);
             break;
           }
         }
       }
     }
 
-    // Extract image
-    let image = $('meta[property="og:image"]').attr('content') ||
-               $('meta[name="twitter:image"]').attr('content') || '';
+    // Step 3: Advanced pattern matching
+    if (originalPriceValue <= 0) {
+      console.log('💰 [HTML Fallback] Trying advanced pattern matching...');
+      const pageText = $.html();
+      const advancedResult = extractPriceWithAdvancedPatterns(pageText, currency);
+      if (advancedResult.price > 0) {
+        originalPriceValue = advancedResult.price;
+        priceConfidence = advancedResult.confidence;
+        console.log(`💰 [HTML Fallback] Advanced pattern price: ${originalPriceValue} ${currency} (confidence: ${priceConfidence})`);
+      }
+    }
 
-    if (!image) {
+    // Step 4: Validate the extracted price
+    if (originalPriceValue > 0) {
+      const validation = validatePrice(originalPriceValue, currency);
+      if (!validation.isValid) {
+        console.log(`⚠️ [HTML Fallback] Price validation failed: ${validation.reason}`);
+        originalPriceValue = 0;
+        priceConfidence = 0;
+      } else {
+        console.log(`✅ [HTML Fallback] Price validation passed: ${originalPriceValue} ${currency}`);
+      }
+    }
+
+    if (originalPriceValue <= 0) {
+      console.log('⚠️ [HTML Fallback] No valid price found after comprehensive extraction');
+    }
+
+    // Extract image with fallback hierarchy
+    let image = '';
+
+    // Step 1: Try OpenGraph and Twitter images first (most reliable)
+    const ogImage = $('meta[property="og:image"]').attr('content') ||
+                   $('meta[name="twitter:image"]').attr('content');
+
+    if (ogImage) {
+      image = ogImage.startsWith('//') ? 'https:' + ogImage : ogImage;
+      console.log('📸 Product image from OpenGraph/Twitter meta tags');
+    } else {
+      // Step 2: Try product-specific image selectors
       const imageSelectors = [
         '[itemprop="image"]',
         '.product-image img',
         '.main-image img',
-        'img[alt*="product"]'
+        'img[alt*="product"]',
+        'img[class*="product"]'
       ];
 
       for (const selector of imageSelectors) {
@@ -935,8 +1443,25 @@ async function scrapeUniversalFallback(url: string): Promise<ScrapedProduct | nu
             const baseUrl = new URL(url);
             image = baseUrl.origin + image;
           }
+          console.log('📸 Product image from page selectors');
           break;
         }
+      }
+    }
+
+    // Image fallback hierarchy implementation
+    if (!image) {
+      console.log('⚠️ No product image found, trying fallback options...');
+
+      // Step 3: Try store logo based on URL (we'll get storeName later)
+      const storeLogo = getStoreLogoMapping(url);
+      if (storeLogo) {
+        image = storeLogo;
+        console.log(`📸 Using store logo fallback: ${storeLogo}`);
+      } else {
+        // Step 4: Final fallback - generic product image
+        image = '/assets/images/generic-product.svg';
+        console.log('📸 Using generic product image fallback');
       }
     }
 
@@ -950,7 +1475,42 @@ async function scrapeUniversalFallback(url: string): Promise<ScrapedProduct | nu
       }
     }
 
-    console.log(`✅ Universal fallback scraping successful: ${title.substring(0, 50)}...`);
+    // Extract store name with fallback logic
+    let storeName: string = 'Pending Product Details';
+
+    // Step 1: Try to extract from URL
+    const urlStoreName = extractStoreNameFromUrl(url);
+    if (urlStoreName) {
+      storeName = urlStoreName;
+      console.log(`📍 Store name from URL: ${storeName}`);
+    } else {
+      // Step 2: Try to extract from page title
+      const pageTitle = $('title').text().trim() || title;
+      const titleStoreName = extractStoreNameFromPageTitle(pageTitle, url);
+      if (titleStoreName) {
+        storeName = titleStoreName;
+        console.log(`📍 Store name from page title: ${storeName}`);
+      } else {
+        // Step 3: Use default fallback
+        console.log(`⚠️ Could not extract store name, using default: ${storeName}`);
+      }
+    }
+
+    // Evaluate extraction quality and determine approval requirements
+    const titleConfidence = title && title !== 'Pending Product Details' ? 0.8 : 0.3;
+    const imageConfidence = image && !image.includes('generic') && !image.includes('logos') ? 0.8 :
+                            image && image.includes('logos') ? 0.5 : 0.2;
+
+    const evaluation = evaluateProductExtraction(title, bdtPrice, image, titleConfidence, priceConfidence, imageConfidence);
+    const approval = determineApprovalRequirement('other', evaluation.extractionStatus);
+
+    console.log(`✅ Universal fallback scraping successful: ${title.substring(0, 50)}... (Status: ${evaluation.extractionStatus})`);
+    console.log(`🔍 [HTML Fallback] Extraction details: Title: ${titleConfidence}, Price: ${priceConfidence}, Image: ${imageConfidence}`);
+    console.log(`📋 [HTML Fallback] Requires approval: ${approval.requiresApproval}, Editable: ${approval.isEditable}`);
+
+    if (evaluation.missingFields.length > 0) {
+      console.log(`⚠️ [HTML Fallback] Missing fields: ${evaluation.missingFields.join(', ')}`);
+    }
 
     return {
       title,
@@ -960,7 +1520,16 @@ async function scrapeUniversalFallback(url: string): Promise<ScrapedProduct | nu
       image,
       availability: 'in_stock',
       store: 'other',
-      storeName
+      storeName,
+      requiresApproval: approval.requiresApproval,
+      isEditable: approval.isEditable,
+      extractionStatus: evaluation.extractionStatus,
+      missingFields: evaluation.missingFields,
+      extractionDetails: {
+        titleConfidence,
+        priceConfidence,
+        imageConfidence
+      }
     };
 
   } catch (error) {
@@ -1299,10 +1868,43 @@ export async function POST(request: NextRequest) {
     }
 
     if (!product) {
-      return NextResponse.json(
-        { success: false, error: 'We were unable to process this product URL. Please verify the link is correct or contact our support team for assistance.' },
-        { status: 500 }
-      );
+      // Task 1.8: Handle cases where we cannot find any information
+      console.log('🔄 All scraping methods failed, generating fallback product');
+
+      try {
+        // Extract basic store information for fallback
+        let fallbackStoreName = 'Unknown Store';
+        try {
+          const urlStoreName = extractStoreNameFromUrl(url);
+          if (urlStoreName) {
+            fallbackStoreName = urlStoreName;
+          } else {
+            const hostname = new URL(url).hostname.replace('www.', '');
+            const domainParts = hostname.split('.');
+            fallbackStoreName = domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1);
+          }
+        } catch (e) {
+          // Keep default fallbackStoreName
+        }
+
+        // Generate fallback product (Task 1.8 implementation)
+        product = generateProductFallback(url, fallbackStoreName);
+
+        console.log(`✅ Generated fallback product for ${fallbackStoreName}`);
+        console.log(`📋 Fallback product requires approval: ${product.requiresApproval}, editable: ${product.isEditable}`);
+
+      } catch (fallbackError) {
+        console.error('❌ Even fallback generation failed:', fallbackError);
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'We were unable to process this product URL. Please verify the link is correct or contact our support team for assistance.',
+            extractionStatus: 'failed',
+            manualEntryRequired: true
+          },
+          { status: 500 }
+        );
+      }
     }
 
     // Generate a unique ID for the product
