@@ -25,6 +25,9 @@ import { ERROR_MESSAGES } from '@/lib/error-messages';
 import { formatBdtPrice } from '@/lib/currency';
 import Image from 'next/image';
 import ProductPreview from '@/components/ProductPreview';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import AuthModal from '@/components/AuthModal';
 
 // Dynamic live activity data pools
 const customerNames = [
@@ -137,7 +140,10 @@ export default function Home() {
   const [liveOrders, setLiveOrders] = useState<LiveOrder[]>([]);
   const [currentPlaceholder, setCurrentPlaceholder] = useState(0);
   const [typedPlaceholder, setTypedPlaceholder] = useState('');
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const { addToCart } = useCart();
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
   // State for current highlighted order
   const [currentOrderIndex, setCurrentOrderIndex] = useState(0);
@@ -317,7 +323,18 @@ export default function Home() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    await handleSearchOrCapture(searchQuery);
+
+    // Check if user is authenticated
+    if (!session) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    // If authenticated, redirect to search page with query
+    if (searchQuery.trim()) {
+      const encodedQuery = encodeURIComponent(searchQuery.trim());
+      router.push(`/search?q=${encodedQuery}`);
+    }
   };
 
   const handleProductApproval = (approvedProduct: Product) => {
@@ -1081,6 +1098,13 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        defaultMode="signin"
+      />
     </div>
   );
 }
