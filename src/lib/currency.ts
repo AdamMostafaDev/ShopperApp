@@ -3,84 +3,159 @@
 const EXCHANGE_API_KEY = 'e7cd555c08dcb78c0280a29dc308f453';
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour cache
 
-// Google currency conversion using Scraper API
+// Global request throttling for ScraperAPI
+let lastScraperRequest = 0;
+const SCRAPER_THROTTLE_MS = 2000; // 2 seconds between requests
+
+// Sleep function for delays
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Google currency conversion using Scraper API with retry mechanism
 async function getGoogleExchangeRate(fromCurrency: string, toCurrency: string = 'BDT'): Promise<number> {
-  try {
-    const scraperApiKey = process.env.SCRAPER_API_KEY;
-    if (!scraperApiKey) {
-      throw new Error('SCRAPER_API_KEY environment variable is not set');
-    }
+  const maxRetries = 3;
+  let attempt = 0;
 
-    // Construct Google search query for currency conversion
-    const query = `1 ${fromCurrency} to ${toCurrency}`;
-    const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+  while (attempt < maxRetries) {
+    try {
+      attempt++;
 
-    // Use Scraper API to fetch Google results
-    const scraperUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(googleUrl)}`;
+      const scraperApiKey = process.env.SCRAPER_API_KEY;
+      if (!scraperApiKey) {
+        throw new Error('SCRAPER_API_KEY environment variable is not set');
+      }
 
-    console.log(`Fetching Google exchange rate: ${fromCurrency} to ${toCurrency}`);
+      // Throttle requests to prevent API overload
+      const now = Date.now();
+      const timeSinceLastRequest = now - lastScraperRequest;
+      if (timeSinceLastRequest < SCRAPER_THROTTLE_MS) {
+        const waitTime = SCRAPER_THROTTLE_MS - timeSinceLastRequest;
+        console.log(`⏱️ Throttling ScraperAPI request - waiting ${waitTime}ms`);
+        await sleep(waitTime);
+      }
+      lastScraperRequest = Date.now();
 
-    const response = await fetch(scraperUrl);
+      // Construct Google search query for currency conversion
+      const query = `1 ${fromCurrency} to ${toCurrency}`;
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 
-    if (!response.ok) {
-      throw new Error(`Scraper API request failed: ${response.status} ${response.statusText}`);
-    }
+      // Enhanced ScraperAPI parameters to avoid blocks
+      const scraperParams = new URLSearchParams({
+        api_key: scraperApiKey,
+        url: googleUrl,
+        render: 'false', // Don't render JavaScript - faster
+        premium: 'true',  // Use premium endpoints
+        country_code: 'us', // Use US proxy
+        device_type: 'desktop'
+      });
 
-    const html = await response.text();
+      const scraperUrl = `http://api.scraperapi.com?${scraperParams.toString()}`;
 
-    // Extract conversion rate from Google's response
-    // Google typically shows the rate in a format like "1 USD = 110.50 BDT"
-    // We need to find the converted value
+      console.log(`Fetching Google exchange rate (attempt ${attempt}/${maxRetries}): ${fromCurrency} to ${toCurrency}`);
 
-    // Pattern 1: Look for the main conversion result
-    const ratePattern = /data-exchange-rate="([0-9.]+)"/;
-    const rateMatch = html.match(ratePattern);
+      const response = await fetch(scraperUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate',
+          'DNT': '1',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1'
+        },
+        timeout: 30000 // 30 second timeout
+      });
 
-    if (rateMatch && rateMatch[1]) {
-      const rate = parseFloat(rateMatch[1]);
-      console.log(`✅ Google exchange rate found (pattern 1): 1 ${fromCurrency} = ${rate} ${toCurrency}`);
-      return rate;
-    }
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error(`❌ ScraperAPI attempt ${attempt} failed: ${response.status} ${response.statusText} - ${errorText}`);
 
-    // Pattern 2: Alternative pattern for the conversion result
-    const altPattern = new RegExp(`1\\s*${fromCurrency}\\s*=\\s*([0-9.,]+)\\s*${toCurrency}`, 'i');
-    const altMatch = html.match(altPattern);
+        if (attempt === maxRetries) {
+          throw new Error(`ScraperAPI request failed after ${maxRetries} attempts: ${response.status} ${response.statusText}`);
+        }
 
-    if (altMatch && altMatch[1]) {
-      const rate = parseFloat(altMatch[1].replace(',', ''));
-      console.log(`✅ Google exchange rate found (pattern 2): 1 ${fromCurrency} = ${rate} ${toCurrency}`);
-      return rate;
-    }
+        // Exponential backoff delay
+        const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+        console.log(`⏳ Retrying in ${delayMs}ms...`);
+        await sleep(delayMs);
+        continue;
+      }
 
-    // Pattern 3: Look in the calculator widget
-    const calcPattern = /<div[^>]*class="[^"]*BNeawe[^"]*"[^>]*>([0-9.,]+)\s*Bangladeshi/i;
-    const calcMatch = html.match(calcPattern);
+      const html = await response.text();
+      console.log(`✅ ScraperAPI success on attempt ${attempt}/${maxRetries}`);
 
-    if (calcMatch && calcMatch[1]) {
-      const rate = parseFloat(calcMatch[1].replace(',', ''));
-      console.log(`✅ Google exchange rate found (pattern 3): 1 ${fromCurrency} = ${rate} ${toCurrency}`);
-      return rate;
-    }
+      // Extract conversion rate from Google's response
+      // Google typically shows the rate in a format like "1 USD = 110.50 BDT"
+      // We need to find the converted value
 
-    // Pattern 4: More generic pattern
-    const genericPattern = />([0-9.,]+)\s*(?:Bangladeshi\s*)?(?:taka|BDT)/i;
-    const genericMatch = html.match(genericPattern);
+      // Pattern 1: Look for the main conversion result
+      const ratePattern = /data-exchange-rate="([0-9.]+)"/;
+      const rateMatch = html.match(ratePattern);
 
-    if (genericMatch && genericMatch[1]) {
-      const rate = parseFloat(genericMatch[1].replace(',', ''));
-      // Sanity check - exchange rates should be reasonable
-      if (rate > 0 && rate < 10000) {
-        console.log(`✅ Google exchange rate found (pattern 4): 1 ${fromCurrency} = ${rate} ${toCurrency}`);
+      if (rateMatch && rateMatch[1]) {
+        const rate = parseFloat(rateMatch[1]);
+        console.log(`✅ Google exchange rate found (pattern 1): 1 ${fromCurrency} = ${rate} ${toCurrency}`);
         return rate;
       }
+
+      // Pattern 2: Alternative pattern for the conversion result
+      const altPattern = new RegExp(`1\\s*${fromCurrency}\\s*=\\s*([0-9.,]+)\\s*${toCurrency}`, 'i');
+      const altMatch = html.match(altPattern);
+
+      if (altMatch && altMatch[1]) {
+        const rate = parseFloat(altMatch[1].replace(',', ''));
+        console.log(`✅ Google exchange rate found (pattern 2): 1 ${fromCurrency} = ${rate} ${toCurrency}`);
+        return rate;
+      }
+
+      // Pattern 3: Look in the calculator widget
+      const calcPattern = /<div[^>]*class="[^"]*BNeawe[^"]*"[^>]*>([0-9.,]+)\s*Bangladeshi/i;
+      const calcMatch = html.match(calcPattern);
+
+      if (calcMatch && calcMatch[1]) {
+        const rate = parseFloat(calcMatch[1].replace(',', ''));
+        console.log(`✅ Google exchange rate found (pattern 3): 1 ${fromCurrency} = ${rate} ${toCurrency}`);
+        return rate;
+      }
+
+      // Pattern 4: More generic pattern
+      const genericPattern = />([0-9.,]+)\s*(?:Bangladeshi\s*)?(?:taka|BDT)/i;
+      const genericMatch = html.match(genericPattern);
+
+      if (genericMatch && genericMatch[1]) {
+        const rate = parseFloat(genericMatch[1].replace(',', ''));
+        // Sanity check - exchange rates should be reasonable
+        if (rate > 0 && rate < 10000) {
+          console.log(`✅ Google exchange rate found (pattern 4): 1 ${fromCurrency} = ${rate} ${toCurrency}`);
+          return rate;
+        }
+      }
+
+      console.warn(`⚠️ No exchange rate found in Google response on attempt ${attempt}/${maxRetries}`);
+
+      if (attempt === maxRetries) {
+        throw new Error('Could not extract exchange rate from Google response after all attempts');
+      }
+
+      // Wait before retrying
+      const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+      console.log(`⏳ Retrying in ${delayMs}ms...`);
+      await sleep(delayMs);
+
+    } catch (error) {
+      console.error(`❌ Error on attempt ${attempt}/${maxRetries}:`, error);
+
+      if (attempt === maxRetries) {
+        throw error;
+      }
+
+      // Wait before retrying
+      const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+      console.log(`⏳ Retrying in ${delayMs}ms...`);
+      await sleep(delayMs);
     }
-
-    throw new Error('Could not extract exchange rate from Google response');
-
-  } catch (error) {
-    console.error('Error fetching Google exchange rate:', error);
-    throw error;
   }
+
+  throw new Error(`Failed to get exchange rate after ${maxRetries} attempts`);
 }
 
 interface ExchangeRates {

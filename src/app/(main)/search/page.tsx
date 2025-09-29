@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { MagnifyingGlassIcon, FunnelIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { StarIcon } from '@heroicons/react/24/outline';
@@ -9,7 +10,9 @@ import { useCart } from '@/lib/cart-context';
 import { myusCategories, MyUSCategory, MyUSSubcategory, buildSearchQuery } from '@/data/myus-categories';
 import { captureProductFromUrl } from '@/lib/product-capture';
 import { ERROR_MESSAGES } from '@/lib/error-messages';
+import { formatBdtPrice } from '@/lib/currency';
 import Image from 'next/image';
+import ProductPreview from '@/components/ProductPreview';
 
 // Filter interfaces
 interface FilterState {
@@ -47,6 +50,7 @@ export default function SearchPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [capturedProducts, setCapturedProducts] = useState<Product[]>([]);
+  const [productsForReview, setProductsForReview] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedStore] = useState<string>('Amazon'); // Default to Amazon
   const [showFilters, setShowFilters] = useState(true); // Always show filters
@@ -55,7 +59,9 @@ export default function SearchPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [isAutoSearching, setIsAutoSearching] = useState(false);
   const { addToCart } = useCart();
+  const searchParams = useSearchParams();
 
   const [filters, setFilters] = useState<FilterState>({
     stores: [],
@@ -91,17 +97,25 @@ export default function SearchPage() {
         const result = await captureProductFromUrl(query);
         
         if (result.success && result.product) {
-          setCapturedProducts(prev => [result.product!, ...prev]);
-          setSearchResults([]); // Clear search results when capturing
+          // Check if product requires approval (non-Amazon products)
+          if (result.product.requiresApproval) {
+            setProductsForReview(prev => [result.product!, ...prev]);
+          } else {
+            // Amazon products go directly to captured products
+            setCapturedProducts(prev => [result.product!, ...prev]);
+          }
+          setSearchResults([]);
         } else {
           setCaptureError(result.error || ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED);
           setSearchResults([]);
           setCapturedProducts([]);
+          setProductsForReview([]);
         }
       } catch (error) {
         setCaptureError('An unexpected error occurred while capturing the product');
         setSearchResults([]);
         setCapturedProducts([]);
+        setProductsForReview([]);
       }
     } else {
       // Handle search
@@ -140,12 +154,14 @@ export default function SearchPage() {
         
         if (data.success) {
           setSearchResults(data.products || []);
-          setCapturedProducts([]); // Clear captured products when searching
+          setCapturedProducts([]);
+          setProductsForReview([]);
           console.log(`Found ${data.products?.length || 0} products for "${query}"`);
         } else {
           console.error('Search failed:', data.error);
           setSearchResults([]);
           setCapturedProducts([]);
+          setProductsForReview([]);
           
           // Show user-friendly error message
           if (data.rateLimited) {
@@ -158,6 +174,7 @@ export default function SearchPage() {
         console.error('Search error:', error);
         setSearchResults([]);
         setCapturedProducts([]);
+        setProductsForReview([]);
         setCaptureError('An unexpected error occurred during search');
       }
     }
@@ -165,20 +182,64 @@ export default function SearchPage() {
     setIsLoading(false);
   };
 
+  // Handle URL parameter search (auto-search when coming from main page)
+  useEffect(() => {
+    const queryParam = searchParams.get('q');
+    if (queryParam && !isAutoSearching) {
+      const decodedQuery = decodeURIComponent(queryParam);
+      // Create a simplified key using URL hash to handle encoding issues
+      const urlHash = btoa(decodedQuery).replace(/[^a-zA-Z0-9]/g, '').slice(0, 20);
+      const processedKey = `processed_${urlHash}`;
+      const timestampKey = `${processedKey}_timestamp`;
+      // Only process if this URL hasn't been processed recently (within 2 minutes)
+      // This prevents rapid duplicates while still allowing fresh data
+      const twoMinutesAgo = Date.now() - 120000; // 2 minutes
+      const lastProcessedTime = parseInt(localStorage.getItem(timestampKey) || '0');
+      const shouldProcess = lastProcessedTime < twoMinutesAgo;
+      if (shouldProcess) {
+        setIsAutoSearching(true);
+        setSearchQuery(decodedQuery);
+        localStorage.setItem(processedKey, 'true');
+        localStorage.setItem(timestampKey, Date.now().toString());
+
+        handleSearchOrCapture(decodedQuery).finally(() => {
+          setIsAutoSearching(false);
+        });
+      } else {
+        // Just set the search query without triggering search
+        setSearchQuery(decodedQuery);
+        console.log('🚫 Blocked duplicate API call - URL processed within 2 minutes');
+      }
+    }
+  }, [searchParams, isAutoSearching]);
+
   // Trigger search when filters change (if there's an active search and not a URL)
   useEffect(() => {
-    if (searchQuery.trim() && !isUrl(searchQuery)) {
+    if (searchQuery.trim() && !isUrl(searchQuery) && !isAutoSearching) {
       const timeoutId = setTimeout(() => {
         handleSearchOrCapture(searchQuery);
       }, 500); // Debounce filter changes
-      
+
       return () => clearTimeout(timeoutId);
     }
-  }, [filters, searchQuery]);
+  }, [filters, searchQuery, isAutoSearching]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    await handleSearchOrCapture(searchQuery);
+    if (!isLoading && !isAutoSearching) {
+      await handleSearchOrCapture(searchQuery);
+    }
+  };
+
+  const handleProductApproval = (approvedProduct: Product) => {
+    // Move product from review to captured products
+    setProductsForReview(prev => prev.filter(p => p.id !== approvedProduct.id));
+    setCapturedProducts(prev => [approvedProduct, ...prev]);
+  };
+
+  const handleProductRejection = (productId: string) => {
+    // Remove product from review list
+    setProductsForReview(prev => prev.filter(p => p.id !== productId));
   };
 
   const toggleCategory = (categoryId: string) => {
@@ -229,23 +290,23 @@ export default function SearchPage() {
   };
 
   const ProductCard = ({ product }: { product: Product }) => (
-    <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-4 border border-gray-200">
-      <div className="aspect-square bg-gray-100 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
-        <img 
-          src={product.image} 
+    <div className="bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 p-4 border border-gray-100 group hover:-translate-y-1 cursor-pointer">
+      <div className="aspect-square bg-gray-50 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+        <img
+          src={product.image}
           alt={product.title}
-          className="w-full h-full object-contain"
+          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
           onError={(e) => {
             e.currentTarget.src = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="%23f3f4f6"/><text x="150" y="150" text-anchor="middle" dy=".3em" fill="%236b7280" font-family="Arial" font-size="16">Product Image</text></svg>`;
           }}
         />
       </div>
-      
+
       <h3 className="font-medium text-gray-900 mb-2 line-clamp-2 text-sm">
         {product.title}
       </h3>
-      
-      {product.rating > 0 && (
+
+      {product.rating && product.rating > 0 && (
         <div className="flex items-center mb-2">
           <div className="flex items-center">
             {renderStars(product.rating)}
@@ -257,19 +318,24 @@ export default function SearchPage() {
       )}
 
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-col space-y-1">
           <span className="text-lg font-bold text-gray-900">
-            ${product.price.toFixed(2)}
+            {formatBdtPrice(product.price)}
           </span>
+          {product.originalPriceValue && product.originalCurrency && (
+            <span className="text-xs text-gray-500">
+              ${product.originalPriceValue.toFixed(2)} {product.originalCurrency}
+            </span>
+          )}
         </div>
-        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full uppercase font-medium">
+        <span className="text-xs bg-gradient-to-r from-blue-500 to-blue-600 text-white px-2 py-1 rounded-full uppercase font-medium">
           {product.store}
         </span>
       </div>
 
-      <button 
+      <button
         onClick={() => addToCart(product)}
-        className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+        className="w-full py-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg hover:from-orange-600 hover:to-orange-700 transition-all text-sm font-semibold transform hover:scale-105 shadow-md"
       >
         Add to Cart
       </button>
@@ -474,13 +540,19 @@ export default function SearchPage() {
                     {/* Results Area */}
           <div className="flex-1">
             {/* Results Header */}
-            {(searchResults.length > 0 || capturedProducts.length > 0) && (
+            {(searchResults.length > 0 || capturedProducts.length > 0 || productsForReview.length > 0) && (
               <div className="flex items-center justify-between mb-6">
                 <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    {productsForReview.length > 0 ? 'Product Review Required' :
+                     capturedProducts.length > 0 ? 'Product Captured' : 'Search Results'}
+                  </h2>
                   <p className="text-sm text-gray-600 mt-1">
-                    {capturedProducts.length > 0 ? 
-                      `${capturedProducts.length} product${capturedProducts.length > 1 ? 's' : ''} captured` :
-                      `${searchResults.length} results found`
+                    {productsForReview.length > 0 ?
+                      `${productsForReview.length} product${productsForReview.length > 1 ? 's' : ''} need${productsForReview.length === 1 ? 's' : ''} your review` :
+                      capturedProducts.length > 0 ?
+                        `${capturedProducts.length} product${capturedProducts.length > 1 ? 's' : ''} ready to add to cart` :
+                        `Found ${searchResults.length} products matching your search`
                     }
                   </p>
                 </div>
@@ -518,6 +590,15 @@ export default function SearchPage() {
             ) : (
               /* Results Grid */
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {/* Show products requiring review */}
+                {productsForReview.map((product) => (
+                  <ProductPreview
+                    key={product.id}
+                    product={product}
+                    onApprove={handleProductApproval}
+                    onReject={handleProductRejection}
+                  />
+                ))}
                 {/* Show captured products */}
                 {capturedProducts.map((product) => (
                   <ProductCard key={product.id} product={product} />
@@ -530,7 +611,7 @@ export default function SearchPage() {
             )}
 
             {/* No Results or Popular Searches */}
-            {!isLoading && searchResults.length === 0 && capturedProducts.length === 0 && (
+            {!isLoading && searchResults.length === 0 && capturedProducts.length === 0 && productsForReview.length === 0 && (
               <div className="text-center py-12">
                 {searchQuery ? (
                   <>
