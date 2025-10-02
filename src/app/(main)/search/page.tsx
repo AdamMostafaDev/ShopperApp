@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { MagnifyingGlassIcon, FunnelIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { StarIcon } from '@heroicons/react/24/outline';
@@ -40,13 +41,9 @@ const sortOptions: SortOption[] = [
 
 const stores = ['Amazon']; // Focus on Amazon only for now
 
-// Popular search suggestions
-const popularSearches = [
-  'AirPods Pro', 'iPhone 15', 'MacBook Air', 'Samsung Galaxy', 'Sony Headphones',
-  'Nintendo Switch', 'iPad', 'Apple Watch', 'Kindle', 'Echo Dot'
-];
-
 export default function SearchPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [capturedProducts, setCapturedProducts] = useState<Product[]>([]);
@@ -62,6 +59,13 @@ export default function SearchPage() {
   const [isAutoSearching, setIsAutoSearching] = useState(false);
   const { addToCart } = useCart();
   const searchParams = useSearchParams();
+
+  // Redirect to home if not authenticated
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/');
+    }
+  }, [status, router]);
 
   const [filters, setFilters] = useState<FilterState>({
     stores: [],
@@ -290,82 +294,101 @@ export default function SearchPage() {
   };
 
   const ProductCard = ({ product }: { product: Product }) => (
-    <div className="bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 p-4 border border-gray-100 group hover:-translate-y-1 cursor-pointer">
-      <div className="aspect-square bg-gray-50 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+    <div className="bg-white rounded-xl shadow-md hover:shadow-2xl transition-all duration-300 p-5 border border-gray-100 group hover:-translate-y-2 cursor-pointer">
+      <div className="aspect-square bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl mb-4 flex items-center justify-center overflow-hidden">
         <img
           src={product.image}
           alt={product.title}
-          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
           onError={(e) => {
             e.currentTarget.src = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="%23f3f4f6"/><text x="150" y="150" text-anchor="middle" dy=".3em" fill="%236b7280" font-family="Arial" font-size="16">Product Image</text></svg>`;
           }}
         />
       </div>
 
-      <h3 className="font-medium text-gray-900 mb-2 line-clamp-2 text-sm">
+      <h3 className="font-semibold text-gray-900 mb-3 line-clamp-2 text-base min-h-[3rem]">
         {product.title}
       </h3>
 
       {product.rating && product.rating > 0 && (
-        <div className="flex items-center mb-2">
+        <div className="flex items-center mb-3">
           <div className="flex items-center">
             {renderStars(product.rating)}
           </div>
-          <span className="text-xs text-gray-500 ml-2">
+          <span className="text-xs text-gray-600 ml-2 font-medium">
             ({product.reviewCount?.toLocaleString()})
           </span>
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex flex-col space-y-1">
-          <span className="text-lg font-bold text-gray-900">
+      <div className="mb-4">
+        <div className="flex items-baseline space-x-2 mb-1">
+          <span className="text-2xl font-bold text-gray-900">
             {formatBdtPrice(product.price)}
           </span>
-          {product.originalPriceValue && product.originalCurrency && (
-            <span className="text-xs text-gray-500">
-              ${product.originalPriceValue.toFixed(2)} {product.originalCurrency}
-            </span>
-          )}
+          <span className="text-xs bg-gradient-to-r from-blue-500 to-blue-600 text-white px-2 py-1 rounded-full uppercase font-medium">
+            {product.store}
+          </span>
         </div>
-        <span className="text-xs bg-gradient-to-r from-blue-500 to-blue-600 text-white px-2 py-1 rounded-full uppercase font-medium">
-          {product.store}
-        </span>
+        {product.originalPriceValue && product.originalCurrency && (
+          <span className="text-xs text-gray-500">
+            ${product.originalPriceValue.toFixed(2)} {product.originalCurrency}
+          </span>
+        )}
       </div>
 
       <button
         onClick={() => addToCart(product)}
-        className="w-full py-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg hover:from-orange-600 hover:to-orange-700 transition-all text-sm font-semibold transform hover:scale-105 shadow-md"
+        className="w-full py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all text-sm font-bold transform hover:scale-105 shadow-lg hover:shadow-xl"
       >
         Add to Cart
       </button>
     </div>
   );
 
+  // Show loading state while checking authentication
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render page content if not authenticated
+  if (!session) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Search Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
+      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 border-b border-gray-200 sticky top-0 z-40 shadow-lg backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {/* Search Form */}
           <form onSubmit={handleSearch} className="mb-4">
-            <div className="flex gap-4 items-center max-w-3xl mx-auto">
-              <div className="flex-1 relative">
-                <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <div className="flex gap-3 items-center max-w-4xl mx-auto">
+              <div className="flex-1 relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-xl opacity-0 group-focus-within:opacity-10 transition-opacity blur-xl"></div>
+                <MagnifyingGlassIcon className="h-6 w-6 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors z-10" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search Amazon products or paste a product link..."
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  placeholder="Search products worldwide or paste any product link..."
+                  className="w-full pl-14 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-lg transition-all hover:shadow-xl hover:border-blue-300 bg-white/80 backdrop-blur-sm placeholder:text-gray-400 relative z-10"
                 />
               </div>
               <button
                 type="submit"
                 disabled={isLoading || !searchQuery.trim()}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                className="relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all group"
               >
-                {isLoading ? (isUrl(searchQuery) ? 'Capturing...' : 'Searching...') : 'Search'}
+                <span className="relative z-10">{isLoading ? (isUrl(searchQuery) ? 'Capturing...' : 'Searching...') : 'Search'}</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 opacity-0 group-hover:opacity-20 transition-opacity"></div>
               </button>
             </div>
           </form>
@@ -382,7 +405,7 @@ export default function SearchPage() {
                     className="object-contain"
                   />
                 </div>
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-gray-700 font-medium">
                   {isLoading ? 'Searching Amazon...' : 'Amazon Results'}
                 </span>
               </div>
@@ -390,10 +413,10 @@ export default function SearchPage() {
                 <button
                   type="button"
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`flex items-center space-x-2 px-3 py-2 border rounded-lg transition-colors text-sm ${
-                    showFilters 
-                      ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                      : 'border-gray-300 hover:bg-gray-50'
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                    showFilters
+                      ? 'bg-blue-50 text-blue-700 border-2 border-blue-200'
+                      : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-2 border-gray-200'
                   }`}
                 >
                   <FunnelIcon className="h-4 w-4" />
@@ -405,12 +428,12 @@ export default function SearchPage() {
 
           {/* Error Display */}
           {captureError && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="mt-4 p-4 bg-red-50 border-2 border-red-200 rounded-xl">
               <div className="flex items-center">
-                <svg className="h-5 w-5 text-red-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5 text-red-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p className="text-red-700 text-sm">{captureError}</p>
+                <p className="text-red-700 text-sm font-medium">{captureError}</p>
               </div>
             </div>
           )}
@@ -423,8 +446,8 @@ export default function SearchPage() {
           {/* Categories Sidebar - Only visible when there are search results */}
           {showFilters && searchResults.length > 0 && (
               <div className="w-64 flex-shrink-0">
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-24">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
+                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sticky top-24">
+                  <h3 className="text-lg font-bold text-gray-900 mb-6">Filters</h3>
 
                 {/* Categories Navigation */}
                 <div className="mb-6">
@@ -541,29 +564,29 @@ export default function SearchPage() {
           <div className="flex-1">
             {/* Results Header */}
             {(searchResults.length > 0 || capturedProducts.length > 0 || productsForReview.length > 0) && (
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <h2 className="text-3xl font-bold text-gray-900">
                     {productsForReview.length > 0 ? 'Product Review Required' :
                      capturedProducts.length > 0 ? 'Product Captured' : 'Search Results'}
                   </h2>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-gray-600 mt-2">
                     {productsForReview.length > 0 ?
                       `${productsForReview.length} product${productsForReview.length > 1 ? 's' : ''} need${productsForReview.length === 1 ? 's' : ''} your review` :
                       capturedProducts.length > 0 ?
                         `${capturedProducts.length} product${capturedProducts.length > 1 ? 's' : ''} ready to add to cart` :
-                        `Found ${searchResults.length} products matching your search`
+                        `Found ${searchResults.length} products`
                     }
                   </p>
                 </div>
-                
+
                 {searchResults.length > 0 && (
-                  <div className="flex items-center space-x-4">
-                    <span className="text-sm text-gray-600">Sort by:</span>
+                  <div className="flex items-center space-x-3">
+                    <span className="text-sm font-medium text-gray-700">Sort by:</span>
                     <select
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value)}
-                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm font-medium"
                     >
                       {sortOptions.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -578,18 +601,21 @@ export default function SearchPage() {
 
             {/* Loading State */}
             {isLoading ? (
-              <div className="flex flex-col justify-center items-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-                <p className="text-gray-600 text-sm">
-                  {isUrl(searchQuery) ? 'Analyzing product page and extracting details...' : 'Searching Amazon products...'}
+              <div className="flex flex-col justify-center items-center py-20">
+                <div className="relative">
+                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200"></div>
+                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-t-blue-600 border-r-transparent border-b-transparent border-l-transparent absolute top-0 left-0"></div>
+                </div>
+                <p className="text-gray-700 text-base font-medium mt-6">
+                  {isUrl(searchQuery) ? 'Analyzing product page...' : 'Searching Amazon products...'}
                 </p>
-                <p className="text-gray-500 text-xs mt-1">
+                <p className="text-gray-500 text-sm mt-2">
                   {isUrl(searchQuery) ? 'This may take 10-30 seconds depending on the website' : 'Please wait...'}
                 </p>
               </div>
             ) : (
               /* Results Grid */
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {/* Show products requiring review */}
                 {productsForReview.map((product) => (
                   <ProductPreview
@@ -610,36 +636,35 @@ export default function SearchPage() {
               </div>
             )}
 
-            {/* No Results or Popular Searches */}
+            {/* No Results */}
             {!isLoading && searchResults.length === 0 && capturedProducts.length === 0 && productsForReview.length === 0 && (
-              <div className="text-center py-12">
+              <div className="text-center py-20">
                 {searchQuery ? (
-                  <>
-                    <p className="text-gray-500 text-lg">
-                      {isUrl(searchQuery) ? ERROR_MESSAGES.PRODUCT_CAPTURE_FAILED : `No products found for "${searchQuery}"`}
-                    </p>
-                    <p className="text-gray-400 text-sm mt-2">
-                      {isUrl(searchQuery) ? 'Please verify the link is correct or contact our support team for assistance.' : 'Try adjusting your search terms'}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Popular Searches</h3>
-                    <div className="flex flex-wrap justify-center gap-2">
-                      {popularSearches.map((search) => (
-                        <button
-                          key={search}
-                          onClick={() => {
-                            setSearchQuery(search);
-                            handleSearchOrCapture(search);
-                          }}
-                          className="px-4 py-2 bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100 transition-colors text-sm"
-                        >
-                          {search}
-                        </button>
-                      ))}
+                  <div className="max-w-md mx-auto">
+                    <div className="w-20 h-20 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+                      <MagnifyingGlassIcon className="w-10 h-10 text-gray-400" />
                     </div>
-                  </>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      {isUrl(searchQuery) ? 'Unable to capture product' : 'No products found'}
+                    </h3>
+                    <p className="text-gray-500">
+                      {isUrl(searchQuery)
+                        ? 'Please verify the link is correct or contact our support team for assistance.'
+                        : `We couldn't find any results for "${searchQuery}". Try different keywords.`}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="max-w-md mx-auto">
+                    <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
+                      <MagnifyingGlassIcon className="w-10 h-10 text-blue-600" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      Start Your Search
+                    </h3>
+                    <p className="text-gray-500">
+                      Search for products or paste a product link to get started
+                    </p>
+                  </div>
                 )}
               </div>
             )}
